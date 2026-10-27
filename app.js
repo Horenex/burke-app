@@ -1,0 +1,873 @@
+/* ---------- utilidades ---------- */
+const pad = n => String(n).padStart(2,"0");
+const isoL = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const T0 = isoL(new Date());
+const SS = 0.3805, RESERVA = 0.10, IVA = 0.21;
+const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
+const DOWL = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const MON = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MONL = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const D = s => new Date(s+"T12:00:00");
+const addDays = (s,n) => { const d=D(s); d.setDate(d.getDate()+n); return isoL(d); };
+const diffDays = (a,b) => Math.round((D(b)-D(a))/864e5);
+const fmtDL = s => { const d=D(s); return `${DOWL[d.getDay()]} ${d.getDate()} de ${MONL[d.getMonth()]}`; };
+const mondayOf = s => addDays(s, -((D(s).getDay()+6)%7));
+const toMin = t => { const [h,m]=t.split(":").map(Number); return h*60+m; };
+const eur = (n,dec=0) => (Math.round(n*100)/100).toLocaleString("es-ES",{minimumFractionDigits:dec,maximumFractionDigits:dec})+" €";
+const num = v => { const n=parseFloat(String(v).replace(",",".")); return isFinite(n)?n:0; };
+const fh = h => String(Math.round(h*100)/100).replace(".",",");
+const pctTxt = m => (m*100).toFixed(1).replace(".",",")+" %";
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = s => document.querySelector(s);
+const up10 = n => Math.ceil(n/10)*10;
+const clone = o => JSON.parse(JSON.stringify(o));
+
+const I = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  calAdd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>',
+  team:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14c2.4 0 4 1.5 4.6 4"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+  range:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M7 15h10M14 12.5l3 2.5-3 2.5"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+  brief:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2M3 12.5h18"/></svg>',
+  hand:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l4-4 3 1 3-2 3 1 5 4"/><path d="M7 7l-4 4 6 6c1 1 2 1 3 0l5-5"/><path d="M10 13l2 2M12 11l2.5 2.5"/></svg>',
+  db:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6.5c0 1.7 3.6 3 8 3s8-1.3 8-3V5.5M4 12v6.5c0 1.7 3.6 3 8 3s8-1.3 8-3V12"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.3-7 8-7s7 2.5 8 7"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  catHead:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4.5 10V3.5l4 3.5h7l4-3.5V10c0 5.5-3.4 9.5-7.5 9.5S4.5 15.5 4.5 10z"/><circle cx="9.3" cy="11.5" r=".9" fill="currentColor"/><circle cx="14.7" cy="11.5" r=".9" fill="currentColor"/><path d="M11 14.5h2l-1 1z" fill="currentColor"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 6h12v10H2zM14 9h4l3 3.5V16h-7z"/><circle cx="6.5" cy="17.5" r="2" fill="var(--surface)"/><circle cx="17.5" cy="17.5" r="2" fill="var(--surface)"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  l:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  r:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+
+/* ---------- datos (sin ejemplos) ---------- */
+const HUES = ["#D9469A","#0E9C8F","#E07B12","#7A4BE0","#2F6FD6","#C2410C","#0F766E","#9333EA"];
+const blankP = () => ({id:"", nombre:"", rol:"", modo:"cache", imp:0, ss:true, tel:"", email:"", zona:"", tallas:"", autonomo:false, coche:false, notas:""});
+const DEF_P = [
+  {...blankP(), id:"javi", nombre:"Javi", rol:"Área de espectáculos", fijo:true, color:"var(--red)"},
+  {...blankP(), id:"raquel", nombre:"Raquel", rol:"Área de espectáculos", fijo:true, color:"var(--green)"}
+];
+let P = DEF_P.map(p=>({...p}));
+function applyPersonal(docs){ const m=new Map(docs.map(d=>[d.id,d]));
+  P=[...DEF_P.map(p=>m.has(p.id)?{...m.get(p.id), fijo:true, color:p.color}:{...p}), ...docs.filter(d=>!DEF_P.some(p=>p.id===d.id))]; }
+// Inversiones: importes de la pestaña AMORTIZACIONES del Excel de cuentas
+let INV = [
+  {id:"kumbre", nombre:"Kumbre", coste:2500, pagado:0},
+  {id:"altavoces", nombre:"Altavoces", coste:3000, pagado:0},
+  {id:"presos", nombre:"Pasacalles Presos", coste:null, pagado:0}
+];
+const CATS_DEF = ["Transporte","Material","Gestoría","Otros"];
+let CATS = [...CATS_DEF];
+let EV = [];
+let LG = [];   // eventos largos con programa
+let actD = null;
+let uid = 1;
+const nid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+let DB = null;
+const plain = o => JSON.parse(JSON.stringify(o));
+function dbErr(e){ toast(e&&e.code==="quota_exceeded" ? "La base de datos está llena" : "No se ha podido guardar. Inténtalo otra vez."); }
+// Dónde se guardan los datos: hoja de Google vía Apps Script (IS_GAS), vía Sheets API (app instalable) o base de datos de Claude
+const IS_GAS = typeof google!=="undefined" && google.script && google.script.run;
+const gas = (fn, ...args) => new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+const RPC = IS_GAS ? gas : (window.SHEETS ? (fn, ...args) => window.SHEETS[fn](...args) : null);
+const safeFoto = f => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(f||"") ? f : "";
+function withTotals(coll, obj){ if(coll!=="eventos") return obj; const r=calc(obj); return {...obj, precio:r.precio, coste:Math.round(r.total), limpio:Math.round(r.limpio)}; }
+async function put(coll, obj){
+  if(RPC){ try{ await RPC("put", coll, plain(withTotals(coll,obj))); }catch(e){ dbErr(e); } return; }
+  if(!DB) return; try{ await DB.collection(coll).doc(obj.id).set(plain(obj)); }catch(e){ dbErr(e); } }
+async function drop(coll, id){
+  if(RPC){ try{ await RPC("drop", coll, id); }catch(e){ dbErr(e); } return; }
+  if(!DB) return; try{ await DB.collection(coll).doc(id).delete(); }catch(e){ dbErr(e); } }
+async function putConfig(){ if(RPC){ const inv={}; INV.forEach(i=>inv[i.id]=i.coste); try{ await RPC("putConfig", {cats:CATS.filter(c=>!CATS_DEF.includes(c)), inv}); }catch(e){ dbErr(e); } return; }
+  if(!DB) return; const inv={}; INV.forEach(i=>inv[i.id]=i.coste); try{ await DB.doc("config/app").set({cats:CATS.filter(c=>!CATS_DEF.includes(c)), inv}); }catch(e){ dbErr(e); } }
+const STEPS = ["Evento","Equipo","Amortización","Gastos","Precio"];
+const LSTEPS = ["Datos generales","Programa"];
+let S = { tab:"inicio", from:"inicio", step:0, d:null, editId:null, month:T0.slice(0,7), selDay:T0, calView:"mes", delArm:false };
+
+/* ---------- cálculos ---------- */
+const person = id => P.find(p=>p.id===id);
+const durOf = e => { if(!e.ini||!e.fin) return 0; let d=toMin(e.fin)-toMin(e.ini); if(d<=0) d+=1440; return Math.round(d/60*100)/100; };
+const horasDe = (r,e) => (r.horas!=null && r.horas!=="") ? num(r.horas) : durOf(e);
+const pago = (r,e) => r.modo==="hora" ? num(r.tarifa)*horasDe(r,e) : num(r.extra);
+const costeDe = (r,e) => pago(r,e)*(r.ss?1+SS:1);
+const pagoTxt = (r,e) => r.modo==="hora" ? `${eur(num(r.tarifa))}/h × ${fh(horasDe(r,e))} h` : `caché ${eur(num(r.extra))}`;
+function amortsAt(P0,e){
+  return INV.filter(i=>num(e.amort[i.id])>0).map(i=>{
+    const pend = i.coste!=null ? Math.max(0,i.coste-i.pagado) : Infinity, pct=num(e.amort[i.id]);
+    return {...i, pct, pend, imp:Math.min(pend, P0*pct/100)};
+  }).filter(a=>a.pend>0);
+}
+function at(P0,e){
+  const fijo = e.equipo.reduce((t,r)=>t+costeDe(r,e),0) + e.gastos.reduce((t,g)=>t+num(g.imp),0);
+  const am=amortsAt(P0,e), cAm=am.reduce((t,a)=>t+a.imp,0), desgaste=P0*RESERVA, total=fijo+cAm+desgaste, limpio=P0-total;
+  return {P:P0, fijo, am, cAm, desgaste, total, limpio, margen:P0>0?limpio/P0:0};
+}
+function resolver(e,obj){
+  const fijo = at(0,e).fijo; let P0=0;
+  for(let k=0;k<6;k++){
+    let fijos=fijo, pcts=0;
+    amortsAt(P0||1e9,e).forEach(a=>{ if(P0 && P0*a.pct/100>=a.pend) fijos+=a.pend; else pcts+=a.pct/100; });
+    const d=1-RESERVA-obj-pcts; P0 = d>0 ? fijos/d : fijos*10;
+  }
+  return P0;
+}
+function calc(e){
+  const obj=e.objetivo??0.30, precio=up10(resolver(e,obj)), minimo=Math.ceil(resolver(e,0)), salida=up10(precio*1.15);
+  return {obj, precio, minimo, salida, ...at(precio,e)};
+}
+const estadoDe = (m,obj) => m>=obj-0.0001 ? "ok" : (m>=0 ? "warn" : "bad");
+
+/* ---------- piezas comunes ---------- */
+function avatar(p,size=36){
+  if(!p) return "";
+  const ini=(p.nombre||"?").trim().split(/\s+/).map(s=>s[0]).slice(0,2).join("").toUpperCase()||"?";
+  const idx=Math.max(0,P.findIndex(x=>x.id===p.id)), bg = p.color || HUES[idx%HUES.length];
+  return safeFoto(p.foto) ? `<span class="av" style="width:${size}px;height:${size}px;background-image:url(${safeFoto(p.foto)})"></span>`
+    : `<span class="av" style="width:${size}px;height:${size}px;background:${bg};font-size:${Math.round(size*.38)}px">${esc(ini)}</span>`;
+}
+const backBtn = to => `<div class="backrow"><button class="back" data-act="back">${I.l}${({calendario:"Calendario", resumen:"Resumen", lresumen:"Resumen", dir:KINDS[S.dirK||"clientes"].title})[to]||"Inicio"}</button></div>`;
+const TABS = [["inicio","Inicio",I.home],["calendario","Calendario",I.cal],["miarea","Mi área",I.user]];
+function render(){
+  const active = S.tab==="dir" ? "inicio" : S.tab==="ent" ? (["resumen","lresumen"].includes(S.entBack)?"calendario":"inicio") : ["resumen","lresumen"].includes(S.tab) ? "calendario" : ["evento","personal","largo"].includes(S.tab) ? (["resumen","lresumen"].includes(S.from)?"calendario":S.from) : S.tab;
+  $("#tabs").innerHTML = TABS.map(([k,t,ic])=>`<button class="tab" data-go="${k}" ${active===k?'aria-current="page"':""}>${ic}<span>${t}</span></button>`).join("");
+  $("#view").innerHTML = ({inicio:vInicio, calendario:vCal, evento:vEvento, personal:vPersonal, resumen:vResumen, largo:vLargo, lresumen:vLResumen, dir:vDir, ent:vEnt, miarea:vMiArea})[S.tab]();
+  const sc = S.tab==="evento";
+  $("#score").hidden = !sc; document.body.classList.toggle("with-score", sc);
+  if(sc){ updateScore(); if(S.step===0) updateDur(); }
+}
+function go(tab){ S.tab=tab; S.delArm=false; render(); window.scrollTo(0,0); }
+function toast(t){ const el=document.createElement("div"); el.className="toast"; el.setAttribute("role","status"); el.textContent=t; document.body.appendChild(el); setTimeout(()=>el.remove(),2400); }
+
+
+/* ---------- INICIO ---------- */
+let dbOpen=false, invOpen=false; try{ dbOpen=localStorage.getItem("burke-db-open")==="1"; invOpen=localStorage.getItem("burke-inv-open")==="1"; }catch(e){}
+function openWip(name){
+  $("#sheetRoot").innerHTML = `<div class="sheet-wrap" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(name)}">
+  <div class="sheet-h"><h3>${esc(name)}</h3><button class="iconbtn" data-act="close" aria-label="Cerrar">${I.x}</button></div>
+  <div class="sheet-body wip"><span class="wipico">${I.box}</span><span class="soon">En desarrollo</span><p>El inventario aún se está diseñando. Pronto podréis consultar y dar de alta el material de la compañía desde aquí.</p>
+  <button class="btn sec2 block" data-act="close">Entendido</button></div></div></div>`;
+  document.body.style.overflow="hidden";
+}
+function vInicio(){
+  const n=k=>DIRS[k].length, np=P.length;
+  return `<div class="hello"><h2>Panel de control</h2></div>
+  <section class="sec"><div class="sec-h"><h3>Acciones</h3></div>
+    <div class="tools">
+      <button class="actbtn wc" data-act="new-ev"><span class="actico">${I.calAdd}</span><b>Añadir evento</b></button>
+    </div></section>
+  <section class="sec dbsec ${dbOpen?"open":""}">
+    <button class="dbhead" data-act="db-toggle" aria-expanded="${dbOpen}"><span class="tico wc">${I.db}</span><span class="t"><b>Base de datos</b><small>${n("clientes")} clientes · ${n("agentes")} agentes · ${n("proveedores")} proveedores · ${np} personas</small></span><span class="chev">${I.r}</span></button>
+    <div class="tools dbtools" ${dbOpen?"":"hidden"}>
+      <button class="tool" data-act="dir" data-k="clientes"><span class="tico gr">${I.brief}</span><span class="t"><b>Clientes</b><small>Empresas, ayuntamientos y particulares, con sus personas de contacto.</small></span><span class="go">${I.r}</span></button>
+      <button class="tool" data-act="dir" data-k="agentes"><span class="tico rd">${I.hand}</span><span class="t"><b>Agentes y distribuidores</b><small>Quien os mueve o vende espectáculos, cuando lo hay.</small></span><span class="go">${I.r}</span></button>
+      <button class="tool" data-act="dir" data-k="proveedores"><span class="tico pv">${I.truck}</span><span class="t"><b>Proveedores</b><small>Material, sonido, vestuario, transporte… a quién compráis o alquiláis.</small></span><span class="go">${I.r}</span></button>
+      <button class="tool" data-act="personal"><span class="tico y">${I.team}</span><span class="t"><b>Personal</b><small>La agenda del equipo: contacto, tallas, cómo cobra cada uno.</small></span><span class="go">${I.r}</span></button>
+    </div></section>
+  <section class="sec dbsec ${invOpen?"open":""}">
+    <button class="dbhead" data-act="inv-toggle" aria-expanded="${invOpen}"><span class="tico inv">${I.box}</span><span class="t"><b>Inventario <span class="soon">En desarrollo</span></b><small>Material y equipo de la compañía</small></span><span class="chev">${I.r}</span></button>
+    <div class="tools dbtools" ${invOpen?"":"hidden"}>
+      <button class="tool" data-act="wip" data-v="Consultar inventario"><span class="tico inv">${I.search}</span><span class="t"><b>Consultar inventario</b><small>Qué tenéis, dónde está y en qué estado.</small></span><span class="go">${I.r}</span></button>
+      <button class="tool" data-act="wip" data-v="Agregar ítem"><span class="tico inv">${I.plus}</span><span class="t"><b>Agregar ítem</b><small>Dar de alta material o equipo nuevo.</small></span><span class="go">${I.r}</span></button>
+    </div></section>`;
+}
+
+/* ---------- AÑADIR EVENTO (5 pasos) ---------- */
+function rowFrom(p){ return {pid:p.id, modo:p.modo||"cache", extra:p.modo==="hora"?0:num(p.imp), tarifa:p.modo==="hora"?num(p.imp):20, horas:null, ss:!!p.ss}; }
+function newDraft(fecha){
+  return {id:null, nombre:"", fecha:fecha||T0, cliente:"", ini:"", fin:"", lugar:"",
+    equipo:P.filter(p=>p.fijo).map(rowFrom), gastos:[], amort:{}, objetivo:0.30, oferta:null};
+}
+function startEvent(from, fecha){ S.d=newDraft(fecha); S.editId=null; S.step=0; S.from=from; go("evento"); }
+function editEvent(id){ const e=EV.find(x=>x.id===id); S.d=clone(e); S.editId=id; S.step=0; S.from="resumen"; go("evento"); }
+function openSummary(id){ S.viewId=id; go("resumen"); }
+
+function vEvento(){
+  const steps = STEPS.map((t,i)=>`<button class="step ${i<S.step?"done":""}" ${i===S.step?'aria-current="step"':""} data-act="step" data-v="${i}"><b>${i+1}</b><span>${t}</span></button>`).join("");
+  const body = [stEvento, stEquipo, stAmort, stGastos, stPrecio][S.step]();
+  return `${backBtn(S.from)}
+  <div class="vh"><h2>${S.editId?"Editar evento":"Añadir evento"}</h2></div>
+  <nav class="steps" aria-label="Pasos">${steps}</nav>
+  <section class="card stepcard">${body}</section>
+  <div class="wnav">${S.step>0?`<button class="btn sec2" data-act="step" data-v="${S.step-1}">${I.l} Atrás</button>`:"<span></span>"}
+    ${S.step<4?`<button class="btn pri" data-act="step" data-v="${S.step+1}">${S.step===3?"Ver precio":"Siguiente"} ${I.r}</button>`:""}</div>`;
+}
+function stEvento(){
+  const e=S.d;
+  return `<h3 class="q">¿Qué evento es?</h3>
+  <label class="f">Nombre del evento<input type="text" id="f-nombre" data-f="nombre" value="${esc(e.nombre)}"></label>
+  <label class="f">Fecha<input type="date" id="f-fecha" data-f="fecha" value="${e.fecha}" style="max-width:220px"></label>${entPicker("clientes","d")}${entPicker("agentes","d")}
+  <div class="row3"><label class="f">Empieza<input type="time" id="f-ini" data-f="ini" value="${e.ini}"></label><label class="f">Termina<input type="time" id="f-fin" data-f="fin" value="${e.fin}"></label><span class="durbadge" id="f-dur">– h</span></div>
+  <p class="hint">Quien cobre por horas toma esta duración; luego puedes cambiársela a cada uno.</p>
+  <label class="f">Dónde es<input type="text" id="f-lugar" data-f="lugar" value="${esc(e.lugar)}" placeholder="Dirección o nombre del sitio"></label>
+  <a class="maplink" id="f-map" target="_blank" rel="noopener" href="#" hidden>Ver en Google Maps ↗</a>`;
+}
+function updateDur(){
+  const e=S.d, b=$("#f-dur"), m=$("#f-map"); if(!e) return;
+  if(b){ const d=durOf(e); b.textContent = d ? fh(d)+" h" : "– h"; }
+  if(m){ m.hidden=!e.lugar; m.href="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(e.lugar||""); }
+}
+function stEquipo(){
+  const e=S.d;
+  const rows=e.equipo.map((r,i)=>{ const p=person(r.pid);
+    return `<div class="person">${avatar(p,38)}
+    <div class="pname"><b>${esc(p?.nombre||"¿?")}</b>${p?.rol?`<small>${esc(p.rol)}</small>`:""}
+      <label class="toggle"><input type="checkbox" id="pss-${i}" data-pss="${i}" ${r.ss?"checked":""}> En nómina (+SS)</label>
+      <span class="pcost" id="pc-${i}">Cuesta ${eur(costeDe(r,e),2)}</span></div>
+    <div class="pay"><div class="seg" role="group" aria-label="Forma de pago"><button data-act="modo" data-i="${i}" data-v="cache" aria-pressed="${r.modo!=="hora"}">Caché</button><button data-act="modo" data-i="${i}" data-v="hora" aria-pressed="${r.modo==="hora"}">Por horas</button></div>
+      ${r.modo==="hora"
+        ? `<div class="payin"><div class="money"><input type="number" inputmode="decimal" min="0" id="pt-${i}" data-p="tarifa" data-i="${i}" value="${r.tarifa}" aria-label="Euros por hora"></div><span class="x">×</span><div class="hrs"><input type="number" inputmode="decimal" min="0" step="0.5" id="ph-${i}" data-p="horas" data-i="${i}" value="${horasDe(r,e)||""}" aria-label="Horas"></div></div>`
+        : `<div class="payin"><div class="money"><input type="number" inputmode="decimal" min="0" id="pe-${i}" data-p="extra" data-i="${i}" value="${r.extra}" aria-label="Caché"></div></div>`}</div>
+    <button class="rm" data-act="p-rm" data-i="${i}" aria-label="Quitar a ${esc(p?.nombre||"")}">×</button></div>`; }).join("");
+  return `<h3 class="q">¿Quién va?</h3><p class="hint">Caché cerrado o por horas. Si va en nómina, la Seguridad Social se suma sola.</p>
+  <div class="people">${rows||`<div class="empty">Aún no va nadie.</div>`}</div>
+  <div class="sec"><div class="sec-h"><h3>Añadir al equipo</h3></div>
+    <div class="search">${I.search}<input type="search" id="pick-q" placeholder="Busca en Personal o escribe un nombre nuevo" aria-label="Buscar persona" autocomplete="off"></div>
+    <div class="list" id="pick-res">${pickRows("")}</div>
+    <p class="hint">Si no está, créala desde aquí: queda guardada en Personal para completar su ficha.</p></div>`;
+}
+function pickRows(q){
+  const e=S.d, list=P.filter(p=>!e.equipo.some(r=>r.pid===p.id)).sort(byName).filter(p=>matchP(p,q));
+  const shown=list.slice(0,8);
+  let h=shown.map(p=>`<button class="prow" data-act="p-add" data-v="${p.id}">${avatar(p,34)}<span class="t"><b>${esc(p.nombre)}</b><small>${esc([p.rol,p.zona].filter(Boolean).join(" · ")||"Sin datos")}</small></span><span class="r">${I.plus}</span></button>`).join("");
+  if(list.length>8) h+=`<div class="empty">Y ${list.length-8} más. Escribe para afinar.</div>`;
+  if(q.trim()) h+=`<button class="prow" data-act="p-new" data-v="${esc(q.trim())}"><span class="av newav" style="width:34px;height:34px">${I.plus}</span><span class="t"><b>Crear «${esc(q.trim())}»</b><small>Persona nueva en Personal</small></span></button>`;
+  return h || `<div class="empty">Todo el personal ya está en este evento.</div>`;
+}
+function stAmort(){
+  const e=S.d, R=calc(e);
+  const boxes=INV.map(inv=>{
+    const pct=num(e.amort[inv.id]), on=pct>0, known=inv.coste!=null, done=known && inv.pagado>=inv.coste;
+    const hit=R.am.find(a=>a.id===inv.id), imp=hit?hit.imp:0;
+    const pagado=known?inv.pagado/inv.coste:0, tras=known?(inv.pagado+imp)/inv.coste:0;
+    return `<div class="inv ${on?"on":""}">
+      <div class="inv-h"><input type="checkbox" id="iv-${inv.id}" data-act="am-on" data-v="${inv.id}" ${on?"checked":""} aria-label="Se usa ${esc(inv.nombre)}">
+        <label class="t" for="iv-${inv.id}"><b>${esc(inv.nombre)}</b><small>${known?`Costó ${eur(inv.coste)}`:"Importe sin poner"}</small></label>
+        <div class="pct">${known?(done?"✓":Math.round((1-pagado)*100)+" %"):"—"}<small>${done?"Pagada":"por amortizar"}</small></div></div>
+      ${known?`<div class="bar"><i class="next" style="width:${Math.min(100,tras*100)}%"></i><i style="width:${pagado*100}%"></i></div>
+        <div class="barleg"><span>Pagado ${eur(inv.pagado)} (${Math.round(pagado*100)} %)</span><span>Quedan ${eur(inv.coste-inv.pagado)}</span></div>`
+        :`<label class="f">¿Cuánto costó?<div class="money" style="max-width:180px"><input type="number" inputmode="decimal" min="0" id="ic-${inv.id}" data-inv="${inv.id}" value=""></div></label>`}
+      ${on?`<div class="cfg"><span style="font-weight:600">Qué parte de lo que se cobra va a pagarla</span>
+        <div class="chips">${[5,10,15,20,25].map(v=>`<button class="chip" data-act="am-pct" data-v="${inv.id}" data-p="${v}" aria-pressed="${pct===v}">${v} %</button>`).join("")}</div>
+        <span>De ${eur(R.precio)} que se cobran, aporta <b class="n">${eur(imp,2)}</b>${known?` y la deja al ${Math.round(tras*100)} % pagada${tras>=0.9999?". Con este evento queda amortizada.":""}`:""}</span></div>`:""}
+    </div>`; }).join("");
+  return `<h3 class="q">¿Qué inversiones se usan?</h3><p class="hint">Marca lo que sale en este evento y qué parte de lo que se cobra va a pagarlo. El precio sube para mantener vuestro beneficio.</p>
+  <div class="amorts">${boxes}</div><p class="hint">Importes de la pestaña de amortizaciones de vuestro Excel de cuentas.</p>`;
+}
+function stGastos(){
+  const e=S.d;
+  const rows=e.gastos.map((g,i)=>`<div class="cost"><b>${esc(g.cat)}</b><div class="money"><input type="number" inputmode="decimal" min="0" id="g-${i}" data-g="${i}" value="${g.imp}" aria-label="Importe de ${esc(g.cat)}"></div><button class="rm" data-act="g-rm" data-i="${i}" aria-label="Quitar ${esc(g.cat)}">×</button></div>`).join("");
+  const free=CATS.filter(c=>!e.gastos.some(g=>g.cat===c));
+  return `<h3 class="q">¿Qué más cuesta?</h3><p class="hint">Furgoneta, material, gestoría… Añade solo lo que tenga este evento.</p>
+  ${rows}
+  ${free.length?`<div class="chips">${free.map(c=>`<button class="chip" data-act="g-add" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div>`:""}
+  <form class="addrow" id="newCat"><input type="text" id="cat-name" placeholder="Otra categoría" aria-label="Nueva categoría"><button class="btn sec2 sm" type="submit">Crear</button></form>
+  <div class="fixed">El 10 % de desgaste de material no hace falta meterlo: se suma solo al precio final.</div>`;
+}
+function stPrecio(){
+  const e=S.d, r=calc(e);
+  const fecha=e.fecha?fmtDL(e.fecha):"", hor=(e.ini&&e.fin)?`${e.ini} a ${e.fin}`:"";
+  return `<h3 class="q">${esc(e.nombre||"Evento sin nombre")}</h3><p class="hint">${[fecha, esc(e.cliente), hor].filter(Boolean).join(" · ")}</p>
+  <div class="pricebox wc"><span class="lbl">Tenéis que cobrar</span><span class="p num">${eur(r.precio)}</span><p>sin IVA · ${eur(r.precio*(1+IVA),2)} con IVA (21 %)</p></div>
+  <div class="objs"><span class="lab">Beneficio que queréis sacar</span>
+    <div class="chips">${[0.2,0.25,0.3,0.35,0.4].map(v=>`<button class="chip" data-act="obj" data-v="${v}" aria-pressed="${Math.abs(v-r.obj)<.001}">${Math.round(v*100)} %</button>`).join("")}</div></div>
+  <div class="tiers">
+    <div class="tier"><small>Precio de salida</small><b>${eur(r.salida)}</b><span>Para tener margen si regatean</span></div>
+    <div class="tier main"><small>Precio objetivo</small><b>${eur(r.precio)}</b><span>Deja el ${Math.round(r.obj*100)} %</span></div>
+    <div class="tier"><small>Por debajo, se pierde</small><b>${eur(r.minimo)}</b><span>Solo cubre gastos</span></div>
+  </div>
+  <div class="brk">
+    ${e.equipo.map(x=>`<div class="bl"><span>${esc(person(x.pid)?.nombre||"¿?")} <span class="d">${pagoTxt(x,e)}${x.ss?" + SS":""}</span></span><span class="v">${eur(costeDe(x,e),2)}</span></div>`).join("")}
+    ${e.gastos.filter(g=>num(g.imp)>0).map(g=>`<div class="bl"><span>${esc(g.cat)}</span><span class="v">${eur(num(g.imp),2)}</span></div>`).join("")}
+    ${r.am.map(a=>`<div class="bl"><span>Amortización ${esc(a.nombre)} <span class="d">${a.pct} % del precio</span></span><span class="v">${eur(a.imp,2)}</span></div>`).join("")}
+    <div class="bl"><span>Desgaste de material <span class="d">10 % del precio</span></span><span class="v">${eur(r.desgaste,2)}</span></div>
+    <div class="bl total"><span>Nos cuesta</span><b>${eur(r.total,2)}</b></div>
+    <div class="bl total"><span>Queda limpio para la empresa</span><b>${eur(r.limpio,2)} · ${pctTxt(r.margen)}</b></div>
+  </div>
+  <div class="check"><h4>¿Y si el cliente ofrece otra cifra?</h4><p class="hint">Escribe lo que te ofrecen (sin IVA) y te digo si sale a cuenta.</p>
+    <div class="money"><input type="number" inputmode="decimal" min="0" id="f-oferta" value="${e.oferta??""}" aria-label="Oferta del cliente"></div><div id="ofertaRes">${ofertaHTML()}</div></div>
+  <button class="btn pri block" data-act="save">${S.editId?"Guardar cambios":"Guardar evento"}</button>
+  ${S.editId?`<button class="linkdel" data-act="del">${S.delArm?"Pulsa otra vez para borrar este evento":"Borrar evento"}</button>`:""}`;
+}
+function ofertaHTML(){
+  const e=S.d; if(!e.oferta||e.oferta<=0) return "";
+  const r=calc(e), o=at(e.oferta,e), st=estadoDe(o.margen,r.obj);
+  const tit={ok:"Sale a cuenta", warn:`Cubre gastos, pero no llega al ${Math.round(r.obj*100)} %`, bad:"Pierde dinero"}[st];
+  const falta=r.precio-e.oferta;
+  return `<div class="verdict ${st}"><span class="vt">${tit}</span><span class="vn num">${eur(o.limpio)}</span><p>limpio para la empresa, un <b>${pctTxt(o.margen)}</b>.${falta>0?` Faltan <b>${eur(falta)}</b> para el precio objetivo.`:""}</p></div>`;
+}
+function updateScore(){
+  const e=S.d; if(!e) return; const r=calc(e);
+  $("#sOut").textContent=eur(r.total); $("#sIn").textContent=eur(r.precio); $("#sNet").textContent=eur(r.limpio);
+  const L=$("#sLight"); L.className="light "+(r.precio>0?estadoDe(r.margen,r.obj):"ok"); L.textContent=Math.round(r.margen*100)+" %";
+}
+
+
+
+/* ---------- ELEGIR TIPO ---------- */
+function chooseAdd(from, fecha, ini, fin){
+  S.pend={from, fecha:fecha||T0, ini, fin};
+  $("#sheetRoot").innerHTML = `<div class="sheet-wrap" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Qué quieres añadir">
+  <div class="sheet-h"><h3>¿Qué quieres añadir?</h3><button class="iconbtn" data-act="close" aria-label="Cerrar">${I.x}</button></div>
+  <div class="sheet-body">
+    <button class="tool" data-act="add-normal"><span class="tico wc">${I.calAdd}</span><span class="t"><b>Evento</b><small>Un bolo: equipo, gastos y amortización, y te dice cuánto cobrar.</small></span><span class="go">${I.r}</span></button>
+    <button class="tool" data-act="add-largo"><span class="tico y">${I.range}</span><span class="t"><b>Evento largo</b><small>Varios días seguidos con su programa diario. Sin cuentas.</small></span><span class="go">${I.r}</span></button>
+  </div></div></div>`;
+  document.body.style.overflow="hidden";
+}
+
+/* ---------- EVENTO LARGO ---------- */
+function daysBetween(a,b){ const out=[]; if(!a||!b||b<a) return a?[a]:out; for(let d=a; d<=b && out.length<93; d=addDays(d,1)) out.push(d); return out; }
+const lgOn = d => LG.filter(l=>l.ini<=d && d<=l.fin);
+const actsOf = (l,d) => l.acts.filter(a=>a.fecha===d).sort((x,y)=>(x.ini||"")>(y.ini||"")?1:-1);
+const fmtShort = s => { const d=D(s); return `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`; };
+const names = ids => ids.map(id=>person(id)?.nombre).filter(Boolean).join(", ");
+function startLargo(from, fecha){ S.L={id:null, nombre:"", cliente:"", lugar:"", ini:fecha||T0, fin:fecha||T0, notas:"", acts:[]}; S.lEditId=null; S.lstep=0; S.from=from; go("largo"); }
+function vLargo(){
+  const L=S.L;
+  const steps=LSTEPS.map((t,i)=>`<button class="step ${i<S.lstep?"done":""}" ${i===S.lstep?'aria-current="step"':""} data-act="lstep" data-v="${i}"><b>${i+1}</b><span>${t}</span></button>`).join("");
+  let body;
+  if(S.lstep===0){
+    body=`<h3 class="q">¿Qué evento es?</h3>
+    <label class="f">Nombre<input type="text" id="l-nombre" data-l="nombre" value="${esc(L.nombre)}"></label>
+    ${entPicker("clientes","L")}${entPicker("agentes","L")}
+    <label class="f">Lugar principal<input type="text" id="l-lugar" data-l="lugar" value="${esc(L.lugar)}"></label>
+    <div class="grid2"><label class="f">Desde<input type="date" id="l-ini" data-l="ini" value="${L.ini}"></label><label class="f">Hasta<input type="date" id="l-fin" data-l="fin" value="${L.fin}"></label></div>
+    <label class="f">Notas<textarea id="l-notas" data-l="notas">${esc(L.notas)}</textarea></label>`;
+  } else {
+    const days=daysBetween(L.ini,L.fin);
+    body=`<h3 class="q">Programa</h3><p class="hint">${days.length} día${days.length===1?"":"s"}. Añade lo que pasa cada día; lo que se repite, créalo una vez y elige en qué días va.</p>
+    <div class="prog">${days.map((d,i)=>{ const acts=L.acts.filter(a=>a.fecha===d).sort((x,y)=>(x.ini||"")>(y.ini||"")?1:-1);
+      return `<div class="pday"><div class="pday-h"><span><b>${fmtShort(d)}</b><small>Día ${i+1}</small></span><button class="linkbtn" data-act="act-new" data-v="${d}">+ Actividad</button></div>
+      ${acts.map(a=>`<div class="act"><button class="act-b" data-act="act-edit" data-v="${a.id}"><span class="h">${a.ini?`${a.ini}${a.fin?"–"+a.fin:""}`:"Sin hora"}</span><span class="x"><b>${esc(a.que)}</b><small>${esc([a.lugar, names(a.gente)].filter(Boolean).join(" · "))}</small></span></button><button class="rm" data-act="act-rm" data-v="${a.id}" aria-label="Quitar ${esc(a.que)}">×</button></div>`).join("")}</div>`; }).join("")}</div>
+    <button class="btn pri block" data-act="lsave">${S.lEditId?"Guardar cambios":"Guardar evento largo"}</button>
+    ${S.lEditId?`<button class="linkdel" data-act="ldel">${S.delArm?"Pulsa otra vez para borrar el evento largo":"Borrar evento largo"}</button>`:""}`;
+  }
+  return `${backBtn(S.from)}
+  <div class="vh"><h2>${S.lEditId?"Editar evento largo":"Añadir evento largo"}</h2></div>
+  <nav class="steps two" aria-label="Pasos">${steps}</nav>
+  <section class="card stepcard">${body}</section>
+  <div class="wnav">${S.lstep>0?`<button class="btn sec2" data-act="lstep" data-v="0">${I.l} Atrás</button>`:"<span></span>"}${S.lstep===0?`<button class="btn pri" data-act="lstep" data-v="1">Programa ${I.r}</button>`:""}</div>`;
+}
+function openAct(id, fecha){
+  const L=S.L;
+  if(id){ const a=L.acts.find(x=>x.id===id); actD={...clone(a), rep:"uno", dias:[a.fecha]}; }
+  else actD={id:null, fecha, ini:"", fin:"", que:"", lugar:"", gente:[], rep:"uno", dias:[fecha]};
+  drawAct();
+}
+function actPeople(q){
+  const list=P.slice().sort(byName).filter(p=>matchP(p,q));
+  return list.map(p=>`<button type="button" class="prow ${actD.gente.includes(p.id)?"on":""}" data-act="act-g" data-v="${p.id}">${avatar(p,32)}<span class="t"><b>${esc(p.nombre)}</b><small>${esc([p.rol,p.zona].filter(Boolean).join(" · ")||" ")}</small></span><span class="ck">${actD.gente.includes(p.id)?I.check:""}</span></button>`).join("") || `<div class="empty">Nadie coincide.</div>`;
+}
+function drawAct(){
+  const a=actD, L=S.L, days=daysBetween(L.ini,L.fin), q=$("#act-q")?.value||"";
+  $("#sheetRoot").innerHTML = `<div class="sheet-wrap" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Actividad">
+  <div class="sheet-h"><h3>${a.id?"Editar actividad":"Nueva actividad"} · ${fmtShort(a.fecha)}</h3><button class="iconbtn" data-act="close" aria-label="Cerrar">${I.x}</button></div>
+  <form class="sheet-body" id="actForm">
+    <label class="f">Qué se hace<input type="text" id="a-que" data-a="que" value="${esc(a.que)}"></label>
+    <div class="grid2"><label class="f">Empieza<input type="time" id="a-ini" data-a="ini" value="${a.ini}"></label><label class="f">Termina<input type="time" id="a-fin" data-a="fin" value="${a.fin}"></label></div>
+    <label class="f">Dónde<input type="text" id="a-lugar" data-a="lugar" value="${esc(a.lugar)}" placeholder="${esc(L.lugar||"Si cambia respecto al lugar principal")}"></label>
+    <div class="sec"><div class="sec-h"><h3>Quién va${a.gente.length?` · ${a.gente.length}`:""}</h3></div>
+      <div class="search">${I.search}<input type="search" id="act-q" placeholder="Buscar en Personal" aria-label="Buscar persona" value="${esc(q)}"></div>
+      <div class="list plist" id="act-plist">${actPeople(q)}</div></div>
+    ${a.id?"":`<div class="sec"><div class="sec-h"><h3>Repetir</h3></div>
+      <div class="seg big" role="group">${[["uno","Solo este día"],["todos","Todos los días"],["elegir","Elegir días"]].map(([k,t])=>`<button type="button" data-act="act-rep" data-v="${k}" aria-pressed="${a.rep===k}">${t}</button>`).join("")}</div>
+      ${a.rep==="elegir"?`<div class="chips">${days.map(d=>`<button type="button" class="chip" data-act="act-day" data-v="${d}" aria-pressed="${a.dias.includes(d)}">${fmtShort(d)}</button>`).join("")}</div>`:""}</div>`}
+    <button class="btn pri block" type="submit">${a.id?"Guardar actividad":"Añadir al programa"}</button>
+  </form></div></div>`;
+  document.body.style.overflow="hidden";
+}
+function saveAct(){
+  const a=actD, L=S.L; if(!a.que.trim()){ $("#a-que").focus(); return; }
+  const base={ini:a.ini, fin:a.fin, que:a.que.trim(), lugar:a.lugar.trim(), gente:[...a.gente]};
+  if(a.id){ Object.assign(L.acts.find(x=>x.id===a.id), base); }
+  else { const days = a.rep==="todos" ? daysBetween(L.ini,L.fin) : a.rep==="elegir" ? a.dias.slice().sort() : [a.fecha];
+    days.forEach(d=>L.acts.push({id:nid("a"), fecha:d, ...base})); if(days.length>1) toast(`Añadida en ${days.length} días`); }
+  closeSheet(); render();
+}
+function vLResumen(){
+  const l=LG.find(x=>x.id===S.lViewId); if(!l) return backBtn("calendario")+`<div class="empty">Este evento ya no existe.</div>`;
+  const days=daysBetween(l.ini,l.fin);
+  return `${backBtn("calendario")}
+  <div class="vh"><span class="tag lgtag">Evento largo</span><h2 style="margin-top:8px">${esc(l.nombre)}</h2><p>Del ${fmtDL(l.ini)} al ${fmtDL(l.fin)} · ${days.length} días</p></div>
+  <div class="facts">${entFacts(l)}<div class="fact"><small>Lugar</small><span>${esc(l.lugar)||"—"}</span></div>
+  ${l.notas?`<div class="fact wide"><small>Notas</small><span>${esc(l.notas)}</span></div>`:""}</div>
+  <section class="sec"><div class="sec-h"><h3>Programa</h3></div>
+  <div class="prog">${days.map((d,i)=>{ const acts=actsOf(l,d);
+    return `<div class="pday ${d===T0?"today":""}"><div class="pday-h"><span><b>${fmtShort(d)}</b><small>Día ${i+1}</small></span></div>
+    ${acts.length?acts.map(a=>`<div class="act ro"><span class="h">${a.ini?`${a.ini}${a.fin?"–"+a.fin:""}`:"Sin hora"}</span><span class="x"><b>${esc(a.que)}</b><small>${esc([a.lugar, names(a.gente)].filter(Boolean).join(" · "))}</small></span></div>`).join(""):`<small class="noact">Sin actividades</small>`}</div>`; }).join("")}</div></section>
+  <button class="btn pri block" data-act="lg-edit">Editar evento largo</button>`;
+}
+
+/* ---------- RESUMEN DEL EVENTO ---------- */
+function vResumen(){
+  const e=EV.find(x=>x.id===S.viewId); if(!e) return backBtn("calendario")+`<div class="empty">Este evento ya no existe.</div>`;
+  const r=calc(e), dur=durOf(e), hor=(e.ini&&e.fin)?`${e.ini} a ${e.fin}`:"Sin horario";
+  const map = e.lugar ? `<a class="maplink" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.lugar)}">Ver en Google Maps ↗</a>` : "";
+  return `${backBtn("calendario")}
+  <div class="vh"><h2>${esc(e.nombre)}</h2><p>${fmtDL(e.fecha)} · ${hor}</p></div>
+  <div class="pricebox wc"><span class="lbl">Precio para el cliente</span><span class="p num">${eur(r.precio)}</span><p>sin IVA · ${eur(r.precio*(1+IVA),2)} con IVA · deja ${eur(r.limpio)} limpio (${Math.round(r.obj*100)} %)</p></div>
+  <div class="facts">
+    ${entFacts(e)}
+    <div class="fact"><small>Duración</small><span class="num">${dur?fh(dur)+" h":"—"}</span></div>
+    <div class="fact wide"><small>Lugar</small><span>${esc(e.lugar)||"—"}</span>${map}</div>
+  </div>
+  <section class="sec"><div class="sec-h"><h3>Equipo · ${e.equipo.length}</h3></div>
+    <div class="list">${e.equipo.map(x=>{ const p=person(x.pid); return `<div class="prow" style="cursor:default">${avatar(p,38)}<span class="t"><b>${esc(p?.nombre||"Persona borrada")}</b><small>${pagoTxt(x,e)}${x.ss?" + SS":""}${p?.tel?" · "+esc(p.tel):""}</small></span><span class="r">${eur(costeDe(x,e),2)}</span></div>`; }).join("")||`<div class="empty">Sin equipo.</div>`}</div></section>
+  <section class="sec"><div class="sec-h"><h3>Cuentas</h3></div>
+    <div class="card brk" style="border-top:1px solid var(--line)">
+      <div class="bl"><span>Equipo</span><span class="v">${eur(e.equipo.reduce((t,x)=>t+costeDe(x,e),0),2)}</span></div>
+      ${e.gastos.filter(g=>num(g.imp)>0).map(g=>`<div class="bl"><span>${esc(g.cat)}</span><span class="v">${eur(num(g.imp),2)}</span></div>`).join("")}
+      ${r.am.map(a=>`<div class="bl"><span>Amortización ${esc(a.nombre)} <span class="d">${a.pct} % del precio</span></span><span class="v">${eur(a.imp,2)}</span></div>`).join("")}
+      <div class="bl"><span>Desgaste de material <span class="d">10 %</span></span><span class="v">${eur(r.desgaste,2)}</span></div>
+      <div class="bl total"><span>Nos cuesta</span><b>${eur(r.total,2)}</b></div>
+      <div class="bl total" style="border-bottom:0"><span>Queda limpio</span><b>${eur(r.limpio,2)} · ${pctTxt(r.margen)}</b></div>
+    </div></section>
+  ${e.oferta?`<section class="sec"><div class="sec-h"><h3>Oferta del cliente</h3></div>${(()=>{ const sd=S.d; S.d=e; const h=ofertaHTML(); S.d=sd; return h; })()}</section>`:""}
+  <button class="btn pri block" data-act="ev-edit">Editar evento</button>`;
+}
+
+
+/* ---------- AGENDAS: CLIENTES Y AGENTES ---------- */
+const KINDS = {
+  clientes:{coll:"clientes", title:"Clientes", one:"cliente", nuevo:"Nuevo cliente", guardado:"guardado en Clientes", idF:"clienteId", nameF:"cliente", ctF:"contactoId",
+    label:"Cliente", ph:"Busca en Clientes o escribe uno nuevo", factLabel:"Cliente", pref:"c",
+    intro:"Cada cliente con sus datos, sus personas de contacto y los eventos que habéis hecho con él.",
+    tipos:["Empresa","Ayuntamiento o administración","Centro comercial","Asociación","Colegio o centro educativo","Particular","Otro"], extra:[]},
+  agentes:{coll:"agentes", title:"Agentes y distribuidores", one:"agente o distribuidor", nuevo:"Nuevo agente o distribuidor", guardado:"guardado en Agentes", idF:"agenteId", nameF:"agente", ctF:"agenteCtId",
+    label:"Agente o distribuidor", ph:"Solo si lo hay: busca o escribe uno nuevo", factLabel:"Agente", pref:"g",
+    intro:"Quien os mueve o vende espectáculos: sus datos, su gente y los eventos que han pasado por él.",
+    tipos:["Agente comercial","Distribuidora","Agencia de espectáculos","Oficina de contratación","Otro"],
+    extra:[["zona","Zona o mercado que cubre","Región de Murcia, Levante…"],["comision","Comisión habitual","Por ejemplo: 10 % del caché"]]},
+  proveedores:{coll:"proveedores", title:"Proveedores", one:"proveedor", nuevo:"Nuevo proveedor", guardado:"guardado en Proveedores", idF:null, pref:"v",
+    intro:"A quién compráis o alquiláis: material, sonido, vestuario, transporte… con sus contactos y condiciones.",
+    tipos:["Material escénico y atrezo","Sonido e iluminación","Vestuario y maquillaje","Transporte","Imprenta y cartelería","Alquiler de espacios o equipos","Otro"],
+    extra:[["suministra","Qué os suministra","Pinturas faciales, carpas, gasoil…"],["pago","Condiciones de pago","Transferencia a 30 días, contado…"]]}
+};
+let DIRS = {clientes:[], agentes:[], proveedores:[]};
+const blankE = k => ({id:"", nombre:"", tipo:KINDS[k].tipos[0], cif:"", tel:"", email:"", direccion:"", web:"", notas:"", zona:"", comision:"", suministra:"", pago:"", contactos:[]});
+const ent = (k,id) => DIRS[k].find(c=>c.id===id);
+const tgt = f => f==="L" ? S.L : S.d;
+const initials = n => (n||"?").trim().split(/\s+/).map(s=>s[0]).slice(0,2).join("").toUpperCase()||"?";
+const entMatch = (c,q) => !q || norm([c.nombre,c.cif,c.tipo,c.direccion,c.zona,c.suministra,...(c.contactos||[]).map(x=>x.nombre+" "+x.cargo)].join(" ")).includes(norm(q));
+const byNom = (a,b) => norm(a.nombre)>norm(b.nombre)?1:-1;
+const entEvents = (k,id) => { const f=KINDS[k].idF; if(!f) return []; return [...EV.filter(e=>e[f]===id).map(e=>({t:"e", e, f:e.fecha})), ...LG.filter(l=>l[f]===id).map(l=>({t:"l", e:l, f:l.ini}))].sort((a,b)=>a.f<b.f?1:-1); };
+function saveEnt(k,c){ DIRS[k]=DIRS[k].some(x=>x.id===c.id) ? DIRS[k].map(x=>x.id===c.id?c:x) : [...DIRS[k], c]; put(KINDS[k].coll, c); }
+function ensureEnt(k,T){
+  const K=KINDS[k], cur=T[K.idF]&&ent(k,T[K.idF]);
+  if(cur){ T[K.nameF]=cur.nombre; return; }
+  const n=(T[K.nameF]||"").trim(); T[K.idF]=null; if(!n) return;
+  const same=DIRS[k].find(c=>norm(c.nombre)===norm(n)); if(same){ T[K.idF]=same.id; return; }
+  const c={...blankE(k), id:nid(K.pref), nombre:n}; saveEnt(k,c); T[K.idF]=c.id; toast(`${n} ${K.guardado}`);
+}
+function entPicker(k,f){
+  const K=KINDS[k], T=tgt(f), c=T[K.idF]&&ent(k,T[K.idF]);
+  const ct = c ? `<div id="ct-wrap-${k}" class="ctwrap"><label class="f">Persona de contacto<select id="ct-sel-${k}" data-k="${k}" data-for="${f}"><option value="">Sin elegir</option>${(c.contactos||[]).map(x=>`<option value="${x.id}" ${x.id===T[K.ctF]?"selected":""}>${esc(x.nombre)}${x.cargo?" · "+esc(x.cargo):""}</option>`).join("")}</select></label>
+    ${(c.contactos||[]).length?"":`<p class="hint" style="margin-top:6px">Aún no tiene personas de contacto. Puedes añadirlas en ${K.title}.</p>`}</div>` : "";
+  return `<div class="clpick" data-k="${k}"><label class="f" for="pk-${k}">${K.label}</label>
+    <div class="search">${I.search}<input type="search" id="pk-${k}" class="pkq" data-k="${k}" data-for="${f}" value="${esc(T[K.nameF]||"")}" placeholder="${K.ph}" autocomplete="off"></div>
+    ${c?`<span class="linked">${I.check} Vinculado a su ficha</span>`:""}
+    <div class="list clres" id="pkres-${k}" hidden></div>${ct}</div>`;
+}
+function showPick(el){
+  const k=el.dataset.k, f=el.dataset.for, K=KINDS[k], q=el.value.trim(), box=$("#pkres-"+k); if(!box) return;
+  document.querySelectorAll(".clres").forEach(x=>{ if(x!==box) x.hidden=true; });
+  const list=DIRS[k].slice().sort(byNom).filter(c=>entMatch(c,q)).slice(0,6);
+  let h=list.map(c=>`<button type="button" class="prow" data-act="pk-pick" data-k="${k}" data-for="${f}" data-v="${c.id}"><span class="av sq ${k}">${esc(initials(c.nombre))}</span><span class="t"><b>${esc(c.nombre)}</b><small>${esc([c.tipo, c.cif, c.zona].filter(Boolean).join(" · "))}</small></span></button>`).join("");
+  if(q && !DIRS[k].some(c=>norm(c.nombre)===norm(q))) h+=`<button type="button" class="prow" data-act="pk-create" data-k="${k}" data-for="${f}" data-v="${esc(q)}"><span class="av newav" style="width:34px;height:34px">${I.plus}</span><span class="t"><b>Crear «${esc(q)}»</b><small>Nuevo en ${K.title}</small></span></button>`;
+  box.innerHTML=h; box.hidden=!h;
+}
+function entFacts(e){
+  return ["clientes","agentes"].map(k=>{ const K=KINDS[k], c=e[K.idF]&&ent(k,e[K.idF]), ct=c&&e[K.ctF]&&(c.contactos||[]).find(x=>x.id===e[K.ctF]), name=c?c.nombre:e[K.nameF];
+    if(k==="agentes" && !name) return "";
+    return `<div class="fact"><small>${K.factLabel}</small>${c?`<button class="factlink" data-act="ent-open" data-k="${k}" data-v="${c.id}">${esc(name)}</button>`:`<span>${esc(name)||"—"}</span>`}</div>`
+      + (ct?`<div class="fact"><small>Contacto${k==="agentes"?" del agente":""}</small><span>${esc(ct.nombre)}${ct.cargo?` <small class="muted">· ${esc(ct.cargo)}</small>`:""}</span>${ct.tel?`<small class="muted num">${esc(ct.tel)}</small>`:""}</div>`:""); }).join("");
+}
+function entRows(k,q){
+  const K=KINDS[k]; if(!DIRS[k].length) return `<div class="empty">Aún no hay ninguno. Añade el primero o créalo al añadir un evento.</div>`;
+  return DIRS[k].slice().sort(byNom).filter(c=>entMatch(c,q)).map(c=>{ const n=entEvents(k,c.id).length, m=(c.contactos||[]).length;
+    return `<button class="prow" data-act="ent-open" data-k="${k}" data-v="${c.id}"><span class="av sq ${k}" style="width:44px;height:44px">${esc(initials(c.nombre))}</span><span class="t"><b>${esc(c.nombre)}</b><small>${esc([c.tipo, c.zona, c.suministra, m?`${m} contacto${m===1?"":"s"}`:"", n?`${n} evento${n===1?"":"s"}`:""].filter(Boolean).join(" · "))}</small></span></button>`; }).join("") || `<div class="empty">Nadie coincide con «${esc(q)}».</div>`;
+}
+function vDir(){
+  const k=S.dirK, K=KINDS[k], q=(S.dirQ||{})[k]||"";
+  return `${backBtn("inicio")}
+  <div class="vh"><h2>${K.title}</h2><p>${K.intro}</p></div>
+  <div class="addrow"><div class="search">${I.search}<input type="search" id="dirq" data-k="${k}" placeholder="Buscar por nombre, CIF o persona de contacto" aria-label="Buscar" value="${esc(q)}"></div><button class="btn pri" data-act="ent-new">${I.plus} Añadir</button></div>
+  <div class="list" id="dir-list">${entRows(k,q)}</div>`;
+}
+function vEnt(){
+  const k=S.entK, K=KINDS[k], c=ent(k,S.entId); if(!c) return backBtn("dir")+`<div class="empty">Esta ficha ya no existe.</div>`;
+  const evs=entEvents(k,c.id), tot=evs.filter(x=>x.t==="e").reduce((t,x)=>t+calc(x.e).precio,0);
+  const fact=(l,v,w)=>v?`<div class="fact ${w?"wide":""}"><small>${l}</small><span>${esc(v)}</span></div>`:"";
+  const facts=[fact("CIF / NIF",c.cif),fact("Teléfono",c.tel),fact("Correo",c.email),fact("Web",c.web),...K.extra.map(([f,l])=>fact(l,c[f])),fact("Dirección",c.direccion,1),fact("Notas",c.notas,1)].join("");
+  return `${backBtn(S.entBack||"dir")}
+  <div class="vh"><span class="tag" style="background:var(--chip);color:var(--muted)">${esc(c.tipo||K.title)}</span><h2 style="margin-top:8px">${esc(c.nombre)}</h2></div>
+  ${facts?`<div class="facts">${facts}</div>`:`<p class="hint">Sin datos todavía. Pulsa «Editar datos» para completar la ficha.</p>`}
+  <section class="sec"><div class="sec-h"><h3>Personas de contacto</h3><button class="linkbtn" data-act="ct-new">+ Añadir contacto</button></div>
+    <div class="list">${(c.contactos||[]).map(x=>`<button class="prow" data-act="ct-edit" data-v="${x.id}"><span class="av" style="width:38px;height:38px;background:var(--brand-deep);font-size:14px">${esc(initials(x.nombre))}</span><span class="t"><b>${esc(x.nombre)}</b><small>${esc([x.cargo, x.tel, x.email].filter(Boolean).join(" · ")||"Sin datos")}</small></span></button>`).join("")||`<div class="empty">Sin personas de contacto todavía.</div>`}</div></section>
+  ${K.idF?`<section class="sec"><div class="sec-h"><h3>Eventos · ${evs.length}</h3>${tot?`<span class="auto num">${eur(tot)} en precios calculados</span>`:""}</div>
+    <div class="list">${evs.map(x=>x.t==="e"
+      ? `<button class="dl" data-act="ev-open" data-v="${x.e.id}"><i></i><span class="h">${fmtShort(x.e.fecha)}</span><span class="x"><b>${esc(x.e.nombre)}</b><small>${esc(x.e.lugar||"")}</small></span><span class="p">${eur(calc(x.e).precio)}</span></button>`
+      : `<button class="dl lgrow" data-act="lg-open" data-v="${x.e.id}"><i></i><span class="h">${fmtShort(x.e.ini)}</span><span class="x"><b>${esc(x.e.nombre)}</b><small>Evento largo · hasta el ${fmtShort(x.e.fin)}</small></span></button>`).join("")||`<div class="empty">Aún no hay eventos vinculados.</div>`}</div></section>`:""}
+  <button class="btn sec2 block" data-act="ent-edit">Editar datos</button>`;
+}
+let editE=null, editCt=null;
+function sheetEnt(id){ const k=S.sheetK; editE = id ? clone(ent(k,id)) : blankE(k); S.delArm=false; drawEnt(); }
+function drawEnt(){
+  const k=S.sheetK, K=KINDS[k], c=editE, isNew=!c.id;
+  $("#sheetRoot").innerHTML = `<div class="sheet-wrap" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="${K.title}">
+  <div class="sheet-h"><h3>${isNew?K.nuevo:esc(c.nombre)}</h3><button class="iconbtn" data-act="close" aria-label="Cerrar">${I.x}</button></div>
+  <form class="sheet-body" id="eForm">
+    <label class="f">Nombre<input type="text" id="e-nombre" value="${esc(c.nombre)}"></label>
+    <div class="grid2"><label class="f">Tipo<select id="e-tipo">${K.tipos.map(t=>`<option ${t===c.tipo?"selected":""}>${t}</option>`).join("")}</select></label><label class="f">CIF / NIF<input type="text" id="e-cif" value="${esc(c.cif)}"></label></div>
+    <div class="grid2"><label class="f">Teléfono<input type="tel" id="e-tel" value="${esc(c.tel)}"></label><label class="f">Correo<input type="email" id="e-email" value="${esc(c.email)}"></label></div>
+    ${K.extra.length?`<div class="grid2">${K.extra.map(([f,l,ph])=>`<label class="f">${l}<input type="text" id="e-${f}" value="${esc(c[f]||"")}" placeholder="${ph}"></label>`).join("")}</div>`:""}
+    <label class="f">Dirección<input type="text" id="e-dir" value="${esc(c.direccion)}"></label>
+    <label class="f">Web<input type="text" id="e-web" value="${esc(c.web)}"></label>
+    <label class="f">Notas<textarea id="e-notas">${esc(c.notas)}</textarea></label>
+    <button class="btn pri block" type="submit">${isNew?"Guardar":"Guardar cambios"}</button>
+    ${isNew?"":`<button type="button" class="linkdel" data-act="ent-del">${S.delArm?"Pulsa otra vez para borrar la ficha":"Borrar ficha"}</button>`}
+  </form></div></div>`;
+  document.body.style.overflow="hidden";
+}
+function submitEnt(){
+  const k=S.sheetK, K=KINDS[k], n=$("#e-nombre").value.trim(); if(!n){ $("#e-nombre").focus(); return; }
+  const c={...editE, nombre:n, tipo:$("#e-tipo").value, cif:$("#e-cif").value.trim(), tel:$("#e-tel").value.trim(), email:$("#e-email").value.trim(), direccion:$("#e-dir").value.trim(), web:$("#e-web").value.trim(), notas:$("#e-notas").value.trim()};
+  K.extra.forEach(([f])=>c[f]=$("#e-"+f).value.trim());
+  const isNew=!c.id; if(isNew) c.id=nid(K.pref);
+  saveEnt(k,c); closeSheet(); toast(isNew?`${n} ${K.guardado}`:"Ficha guardada");
+  if(isNew){ S.entK=k; S.entId=c.id; S.entBack="dir"; go("ent"); } else render();
+}
+function sheetContacto(id){ const c=ent(S.entK,S.entId); editCt = id ? {...(c.contactos||[]).find(x=>x.id===id)} : {id:"", nombre:"", cargo:"", tel:"", email:"", notas:""}; S.delArm=false; drawContacto(); }
+function drawContacto(){
+  const x=editCt, isNew=!x.id, c=ent(S.entK,S.entId);
+  $("#sheetRoot").innerHTML = `<div class="sheet-wrap" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Persona de contacto">
+  <div class="sheet-h"><h3>${isNew?"Nuevo contacto":esc(x.nombre)} · ${esc(c.nombre)}</h3><button class="iconbtn" data-act="close" aria-label="Cerrar">${I.x}</button></div>
+  <form class="sheet-body" id="ctForm">
+    <div class="grid2"><label class="f">Nombre<input type="text" id="k-nombre" value="${esc(x.nombre)}"></label><label class="f">Cargo<input type="text" id="k-cargo" value="${esc(x.cargo)}" placeholder="Concejal de fiestas, gerente…"></label></div>
+    <div class="grid2"><label class="f">Teléfono<input type="tel" id="k-tel" value="${esc(x.tel)}"></label><label class="f">Correo<input type="email" id="k-email" value="${esc(x.email)}"></label></div>
+    <label class="f">Notas<textarea id="k-notas">${esc(x.notas)}</textarea></label>
+    <button class="btn pri block" type="submit">${isNew?"Añadir contacto":"Guardar cambios"}</button>
+    ${isNew?"":`<button type="button" class="linkdel" data-act="ct-del">${S.delArm?"Pulsa otra vez para borrar el contacto":"Borrar contacto"}</button>`}
+  </form></div></div>`;
+  document.body.style.overflow="hidden";
+}
+function submitContacto(){
+  const n=$("#k-nombre").value.trim(); if(!n){ $("#k-nombre").focus(); return; }
+  const kc={...editCt, nombre:n, cargo:$("#k-cargo").value.trim(), tel:$("#k-tel").value.trim(), email:$("#k-email").value.trim(), notas:$("#k-notas").value.trim()};
+  const c=clone(ent(S.entK,S.entId)); c.contactos=c.contactos||[];
+  if(kc.id) c.contactos=c.contactos.map(x=>x.id===kc.id?kc:x); else { kc.id=nid("k"); c.contactos.push(kc); }
+  saveEnt(S.entK,c); closeSheet(); toast("Contacto guardado"); render();
+}
+
+
+/* ---------- MI ÁREA ---------- */
+const BASE_NOMINA = 650, HORAS_MES = 80;
+try{ S.me = localStorage.getItem("burke-yo") || "javi"; }catch(e){ S.me="javi"; }
+if(!["javi","raquel"].includes(S.me)) S.me="javi";
+S.nomMonth = T0.slice(0,7);
+function vMiArea(){
+  const p=person(S.me)||DEF_P[0], [y,m]=S.nomMonth.split("-").map(Number);
+  const evs=EV.filter(e=>e.fecha.startsWith(S.nomMonth)).map(e=>({e, r:e.equipo.find(x=>x.pid===S.me)})).filter(x=>x.r).sort((a,b)=>a.e.fecha>b.e.fecha?1:-1);
+  const extras=evs.reduce((t,x)=>t+pago(x.r,x.e),0), total=BASE_NOMINA+extras;
+  const info=[["Teléfono",p.tel],["Correo",p.email],["Dónde vive",p.zona],["Tallas",p.tallas]].filter(x=>x[1]);
+  return `<div class="vh"><h2>Mi área <span class="soon">En desarrollo</span></h2></div>
+  <div class="seg big" role="group" aria-label="Quién eres">${["javi","raquel"].map(k=>`<button data-act="yo" data-v="${k}" aria-pressed="${S.me===k}">Soy ${CORE_NAME(k)}</button>`).join("")}</div>
+  <section class="me wc">
+    <button class="mephoto" data-act="my-photo" aria-label="Cambiar foto de perfil">${safeFoto(p.foto)?`<img src="${safeFoto(p.foto)}" alt="">`:`<span class="meini">${esc(initials(p.nombre))}</span>`}<span class="mecam">${I.cam}</span></button>
+    <div class="meinfo"><b>${esc(p.nombre)}</b><span>${esc(p.rol||"Área de espectáculos")}</span><button class="mebtn" data-act="my-edit">Editar mis datos</button></div>
+  </section>
+  ${info.length?`<div class="facts">${info.map(([l,v])=>`<div class="fact"><small>${l}</small><span>${esc(v)}</span></div>`).join("")}</div>`:`<p class="hint">Completa tus datos (teléfono, correo, tallas…) con «Editar mis datos».</p>`}
+  <section class="sec"><div class="sec-h"><h3>Nómina del mes</h3></div>
+    <div class="card nom">
+      <div class="calbar"><button class="iconbtn" data-act="nom-nav" data-v="-1" aria-label="Mes anterior">${I.l}</button><b>${MONL[m-1]} ${y}</b><button class="iconbtn" data-act="nom-nav" data-v="1" aria-label="Mes siguiente">${I.r}</button></div>
+      <div class="nomtot"><span class="num">${eur(total)}</span><small>netos</small></div>
+      <div class="brk">
+        <div class="bl"><span>Sueldo base</span><span class="v">${eur(BASE_NOMINA)}</span></div>
+        ${evs.map(x=>`<div class="bl"><span>${esc(x.e.nombre)} <span class="d">${fmtShort(x.e.fecha)} · ${pagoTxt(x.r,x.e)}</span></span><span class="v">${eur(pago(x.r,x.e))}</span></div>`).join("")}
+        <div class="bl total"><span>Total${evs.length?` · ${evs.length} evento${evs.length===1?"":"s"}`:""}</span><b>${eur(total)}</b></div>
+      </div>
+      <p class="hint">Base más los extras de los eventos del mes en los que vas. Importes netos, como en el Excel de cuentas.</p>
+    </div></section>
+  <section class="sec"><div class="sec-h"><h3>Horas del mes <span class="soon">En desarrollo</span></h3></div>
+    <div class="card hrs-card"><div class="hrsbig"><span class="num">0</span><small>/ ${HORAS_MES} h</small></div><div class="bar"><i style="width:0%"></i></div>
+      <p class="hint">Cuando haya control de horas, aquí verás cuántas te quedan por hacer este mes.</p></div></section>`;
+}
+const CORE_NAME = k => (person(k)||DEF_P.find(p=>p.id===k)).nombre;
+
+
+/* ---------- PERSONAL ---------- */
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const matchP = (p,q) => !q || norm([p.nombre,p.rol,p.zona,p.tel,p.email].join(" ")).includes(norm(q));
+const byName = (a,b) => a.fijo!==b.fijo ? (a.fijo?-1:1) : norm(a.nombre)>norm(b.nombre)?1:-1;
+function personalRows(q){
+  const list=P.slice().sort(byName).filter(p=>matchP(p,q));
+  return list.length ? list.map(p=>`<button class="prow" data-act="p-open" data-v="${p.id}">${avatar(p,44)}<span class="t"><b>${esc(p.nombre)}</b><small>${esc([p.rol, p.tel, p.zona].filter(Boolean).join(" · ")||"Ficha por completar")}</small></span><span class="r">${num(p.imp)?(p.modo==="hora"?`${eur(num(p.imp))}/h`:`caché ${eur(num(p.imp))}`):""}</span></button>`).join("") : `<div class="empty">Nadie coincide con «${esc(q)}».</div>`;
+}
+function vPersonal(){
+  return `${backBtn("inicio")}
+  <div class="vh"><h2>Personal</h2><p>Tu agenda de equipo. Toca a alguien para ver o editar su ficha.</p></div>
+  <div class="addrow"><div class="search">${I.search}<input type="search" id="per-q" placeholder="Buscar por nombre, qué hace, zona o teléfono" aria-label="Buscar en Personal" value="${esc(S.perQ||"")}"></div><button class="btn pri" data-act="p-open" data-v="">${I.plus} Añadir</button></div>
+  <div class="list" id="per-list">${personalRows(S.perQ||"")}</div>
+  ${P.length<=2?`<p class="hint">Aún no has registrado a nadie más del equipo.</p>`:""}`;
+}
+let editP = null;
+function sheetPersona(id){ editP = id ? {...person(id)} : blankP(); S.delArm=false; drawPersona(); }
+function drawPersona(){
+  const p=editP, isNew=!p.id;
+  $("#sheetRoot").innerHTML = `<div class="sheet-wrap" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ficha de persona">
+  <div class="sheet-h"><h3>${isNew?"Nueva persona":esc(p.nombre)}</h3><button class="iconbtn" data-act="close" aria-label="Cerrar">${I.x}</button></div>
+  <form class="sheet-body" id="pForm">
+    <div class="photo">${avatar(p,72)}<button type="button" class="btn sec2 sm" data-act="photo">${p.foto?"Cambiar foto":"Poner foto"}</button></div>
+    <div class="grid2"><label class="f">Nombre<input type="text" id="p-nombre" value="${esc(p.nombre)}" ${p.fijo?"readonly":""}></label><label class="f">Qué hace<input type="text" id="p-rol" value="${esc(p.rol)}"></label></div>
+    <div class="grid2"><label class="f">Teléfono<input type="tel" id="p-tel" value="${esc(p.tel)}"></label><label class="f">Correo<input type="email" id="p-email" value="${esc(p.email)}"></label></div>
+    <div class="grid2"><label class="f">Dónde vive<input type="text" id="p-zona" value="${esc(p.zona)}"></label><label class="f">Tallas<input type="text" id="p-tallas" value="${esc(p.tallas)}" placeholder="Ropa y pie"></label></div>
+    <div class="grid2"><label class="f">Autónomo<select id="p-aut"><option value="0" ${!p.autonomo?"selected":""}>No</option><option value="1" ${p.autonomo?"selected":""}>Sí</option></select></label>
+      <label class="f">Coche propio<select id="p-coche"><option value="0" ${!p.coche?"selected":""}>No</option><option value="1" ${p.coche?"selected":""}>Sí</option></select></label></div>
+    <div class="grid2"><label class="f">Cómo cobra normalmente<select id="p-modo"><option value="cache" ${p.modo!=="hora"?"selected":""}>Caché</option><option value="hora" ${p.modo==="hora"?"selected":""}>Por horas</option></select></label>
+      <label class="f">Importe (caché o €/h)<div class="money"><input type="number" inputmode="decimal" min="0" id="p-imp" value="${num(p.imp)||""}"></div></label></div>
+    <label class="toggle" style="font-size:14px"><input type="checkbox" id="p-ss" ${p.ss?"checked":""}> Va en nómina (se le suma la Seguridad Social)</label>
+    <label class="f">Notas<textarea id="p-notas">${esc(p.notas)}</textarea></label>
+    <p class="hint">DNI y número de cuenta no van aquí: irán en la hoja protegida del Drive.</p>
+    <button class="btn pri block" type="submit">${isNew?"Guardar en Personal":"Guardar cambios"}</button>
+    ${!isNew&&!p.fijo?`<button type="button" class="linkdel" data-act="p-del">${S.delArm?"Pulsa otra vez para borrar la ficha":"Borrar ficha"}</button>`:""}
+  </form></div></div>`;
+  document.body.style.overflow="hidden";
+}
+function readPForm(){ const g=id=>$(id)?.value??""; if(!$("#pForm")) return {};
+  return {nombre:g("#p-nombre").trim()||editP.nombre, rol:g("#p-rol"), tel:g("#p-tel"), email:g("#p-email"), zona:g("#p-zona"), tallas:g("#p-tallas"), autonomo:g("#p-aut")==="1", coche:g("#p-coche")==="1", modo:g("#p-modo"), imp:num(g("#p-imp")), ss:!!$("#p-ss")?.checked, notas:g("#p-notas")}; }
+function closeSheet(){ $("#sheetRoot").innerHTML=""; document.body.style.overflow=""; editP=null; actD=null; editE=null; editCt=null; }
+
+/* ---------- CALENDARIO ---------- */
+const evsOn = d => EV.filter(e=>e.fecha===d).sort((a,b)=>(a.ini||"")>(b.ini||"")?1:-1);
+const QN = ["1er","2º","3er","4º"];
+function navLabel(){
+  if(S.calView==="semana"){ const ws=mondayOf(S.selDay), we=addDays(ws,6), a=D(ws), b=D(we);
+    return a.getMonth()===b.getMonth() ? `${a.getDate()} – ${b.getDate()} ${MON[b.getMonth()]} ${b.getFullYear()}` : `${a.getDate()} ${MON[a.getMonth()]} – ${b.getDate()} ${MON[b.getMonth()]} ${b.getFullYear()}`; }
+  const [y,m]=S.month.split("-").map(Number);
+  if(S.calView==="trimestre"){ const q=Math.floor((m-1)/3); return `${QN[q]} trimestre ${y}`; }
+  return `${MONL[m-1]} ${y}`;
+}
+function monthCells(month, mini){
+  const [y,m]=month.split("-").map(Number), start=mondayOf(`${month}-01`), last=isoL(new Date(y,m,0,12)), rows=Math.ceil((diffDays(start,last)+1)/7);
+  return [...Array(rows*7)].map((_,i)=>{ const d=addDays(start,i), out=!d.startsWith(month), ev=evsOn(d);
+    if(mini) return out ? `<span class="qd out"></span>` : `<button class="qd ${ev.length?"has":""} ${lgOn(d).length?"lg":""} ${d===T0?"today":""} ${d===S.selDay?"sel":""}" data-act="selday" data-v="${d}" aria-label="${fmtDL(d)}, ${ev.length} eventos">${D(d).getDate()}</button>`;
+    return `<button class="mc ${out?"out":""} ${d===T0?"today":""} ${d===S.selDay?"sel":""}" data-act="selday" data-v="${d}" aria-label="${fmtDL(d)}, ${ev.length} eventos"><span class="n">${D(d).getDate()}</span>
+      ${lgOn(d).map(l=>`<span class="mlg ${d===l.ini?"s":""} ${d===l.fin?"e":""}">${(d===l.ini||D(d).getDay()===1)?esc(l.nombre):"&nbsp;"}</span>`).join("")}
+      ${ev.slice(0,3).map(e=>`<span class="mev">${esc(e.nombre)}</span>`).join("")}${ev.length>3?`<span class="more">+${ev.length-3}</span>`:""}</button>`; }).join("");
+}
+const DH = ["L","M","X","J","V","S","D"];
+function viewMes(){ return `<div class="month"><div class="mh">${DH.map(x=>`<span>${x}</span>`).join("")}</div><div class="mg">${monthCells(S.month,false)}</div></div>`; }
+function viewTrimestre(){
+  const [y,m]=S.month.split("-").map(Number), q0=Math.floor((m-1)/3)*3;
+  return `<div class="quarter">${[0,1,2].map(k=>{ const mm=`${y}-${pad(q0+k+1)}`, evs=EV.filter(e=>e.fecha.startsWith(mm)), tot=evs.reduce((t,e)=>t+calc(e).precio,0);
+    return `<div class="qm"><button class="qh" data-act="goto-month" data-v="${mm}"><b>${MONL[q0+k]}</b><small>${evs.length?`${evs.length} evento${evs.length===1?"":"s"} · ${eur(tot)}`:"Sin eventos"}</small></button>
+      <div class="qg">${DH.map(x=>`<span class="qw">${x}</span>`).join("")}${monthCells(mm,true)}</div></div>`; }).join("")}</div>`;
+}
+function viewSemana(){
+  const ws=mondayOf(S.selDay), days=[0,1,2,3,4,5,6].map(i=>addDays(ws,i)), PX=34;
+  const timed=days.flatMap(d=>evsOn(d).filter(e=>e.ini));
+  let H0=9, H1=22;
+  timed.forEach(e=>{ H0=Math.min(H0,Math.floor(toMin(e.ini)/60)); const f=e.fin?toMin(e.fin):toMin(e.ini)+60; H1=Math.max(H1, f<=toMin(e.ini)?24:Math.ceil(f/60)); });
+  H1=Math.min(24,H1);
+  days.forEach(d=>lgOn(d).forEach(l=>actsOf(l,d).filter(a=>a.ini).forEach(a=>{ H0=Math.min(H0,Math.floor(toMin(a.ini)/60)); const f=a.fin?toMin(a.fin):toMin(a.ini)+60; H1=Math.max(H1, f<=toMin(a.ini)?24:Math.ceil(f/60)); })));
+  H1=Math.min(24,H1);
+  const allday=days.map(d=>`<div class="wad">${lgOn(d).map(l=>`<button class="wev lgb ${d===l.ini?"s":""} ${d===l.fin?"e":""}" data-act="lg-open" data-v="${l.id}">${(d===l.ini||d===days[0])?esc(l.nombre):"&nbsp;"}</button>`).join("")}${evsOn(d).filter(e=>!e.ini).map(e=>`<button class="wev ad" data-act="ev-open" data-v="${e.id}">${esc(e.nombre)}</button>`).join("")}</div>`).join("");
+  const hasAD=days.some(d=>evsOn(d).some(e=>!e.ini) || lgOn(d).length);
+  const cols=days.map(d=>{
+    const mk=(ini,fin,o)=>{ const a=toMin(ini); let b=fin?toMin(fin):a+60; if(b<=a) b=1440; return {...o,a,b}; };
+    const evs=[...evsOn(d).filter(e=>e.ini).map(e=>mk(e.ini,e.fin,{act:"ev-open", id:e.id, t:e.ini, n:e.nombre, k:""})),
+      ...lgOn(d).flatMap(l=>actsOf(l,d).filter(x=>x.ini).map(x=>mk(x.ini,x.fin,{act:"lg-open", id:l.id, t:x.ini, n:x.que, k:"actb"})))].sort((x,y)=>x.a-y.a);
+    const lanes=[]; evs.forEach(x=>{ let l=lanes.findIndex(end=>end<=x.a); if(l<0){ l=lanes.length; lanes.push(0);} lanes[l]=x.b; x.l=l; });
+    const n=Math.max(1,lanes.length);
+    const blocks=evs.map(x=>{ const top=(x.a-H0*60)/60*PX, h=Math.max(PX*.7,(Math.min(x.b,H1*60)-x.a)/60*PX);
+      return `<button class="wev ${x.k}" style="top:${top}px;height:${h}px;left:calc(${x.l/n*100}% + 2px);width:calc(${100/n}% - 4px)" data-act="${x.act}" data-v="${x.id}"><span class="wt">${x.t}</span><span class="wn">${esc(x.n)}</span></button>`; }).join("");
+    return `<div class="wcol ${d===T0?"today":""}" data-act="slot" data-d="${d}" data-h0="${H0}" style="height:${(H1-H0)*PX}px">${blocks}</div>`; }).join("");
+  return `<div class="week">
+    <div class="wh"><span></span>${days.map(d=>`<button class="${d===T0?"today":""} ${d===S.selDay?"sel":""}" data-act="selday" data-v="${d}">${DOW[D(d).getDay()]}<b>${D(d).getDate()}</b></button>`).join("")}</div>
+    ${hasAD?`<div class="wrow"><span class="wlab">día</span>${allday}</div>`:""}
+    <div class="wbody"><div class="whrs">${[...Array(H1-H0)].map((_,i)=>`<span style="height:${PX}px">${H0+i}</span>`).join("")}</div>${cols}</div>
+  </div><p class="hint">Toca un hueco para añadir un evento a esa hora.</p>`;
+}
+function vCal(){
+  const v=S.calView;
+  const it=evsOn(S.selDay), lgs=lgOn(S.selDay);
+  const lgList=lgs.map(l=>{ const days=daysBetween(l.ini,l.fin), n=days.indexOf(S.selDay)+1;
+    return `<button class="dl lgrow" data-act="lg-open" data-v="${l.id}"><i></i><span class="h">Día ${n}/${days.length}</span><span class="x"><b>${esc(l.nombre)}</b><small>Evento largo · hasta el ${fmtShort(l.fin)}</small></span></button>`
+      + actsOf(l,S.selDay).map(a=>`<button class="dl sub" data-act="lg-open" data-v="${l.id}"><i></i><span class="h">${a.ini?`${a.ini}${a.fin?"–"+a.fin:""}`:"Sin hora"}</span><span class="x"><b>${esc(a.que)}</b><small>${esc([a.lugar, names(a.gente)].filter(Boolean).join(" · "))}</small></span></button>`).join(""); }).join("");
+  return `<div class="vh"><h2>Calendario</h2></div>
+  <div class="seg big" role="group" aria-label="Vista">${[["semana","Semana"],["mes","Mes"],["trimestre","Trimestre"]].map(([k,t])=>`<button data-act="calview" data-v="${k}" aria-pressed="${v===k}">${t}</button>`).join("")}</div>
+  <div class="calbar"><button class="iconbtn" data-act="cal-nav" data-v="-1" aria-label="Anterior">${I.l}</button><b>${navLabel()}</b><button class="iconbtn" data-act="cal-nav" data-v="1" aria-label="Siguiente">${I.r}</button></div>
+  ${v==="semana"?viewSemana():v==="trimestre"?viewTrimestre():viewMes()}
+  <section class="sec"><div class="sec-h"><h3>${fmtDL(S.selDay)}</h3>${S.selDay!==T0?`<button class="linkbtn" data-act="cal-today">Hoy</button>`:""}</div>
+  <div class="list">${lgList}${it.map(e=>`<button class="dl" data-act="ev-open" data-v="${e.id}"><i></i><span class="h">${e.ini?`${e.ini}${e.fin?"–"+e.fin:""}`:"Sin hora"}</span><span class="x"><b>${esc(e.nombre)}</b><small>${esc(e.lugar||e.cliente||"")}</small></span><span class="p">${eur(calc(e).precio)}</span></button>`).join("")}
+    <button class="dl add" data-act="new-day">${I.plus}<span>Añadir evento este día</span></button></div></section>
+  ${EV.length||LG.length?"":`<p class="hint">Aún no hay eventos. Los que guardes desde Añadir evento aparecen aquí.</p>`}`;
+}
+
+/* ---------- eventos de la interfaz ---------- */
+document.addEventListener("click", e=>{
+  const el=e.target.closest("[data-act],[data-go]"); if(!el) return;
+  if(el.dataset.go){ closeSheet(); go(el.dataset.go); return; }
+  const a=el.dataset.act, v=el.dataset.v, d=S.d;
+  if(!["del","p-del","ldel","ent-del","ct-del"].includes(a)) S.delArm=false;
+  switch(a){
+    case "close": closeSheet(); break;
+    case "yo": S.me=v; try{ localStorage.setItem("burke-yo", v); }catch(_){} render(); break;
+    case "my-photo": S.photoFor=S.me; $("#photoIn").click(); break;
+    case "my-edit": sheetPersona(S.me); break;
+    case "nom-nav": { const [y,m]=S.nomMonth.split("-").map(Number); const dt=new Date(y,m-1+(+v),1,12); S.nomMonth=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`; render(); break; }
+    case "inv-toggle": invOpen=!invOpen; try{ localStorage.setItem("burke-inv-open", invOpen?"1":"0"); }catch(_){} render(); break;
+    case "wip": openWip(v); break;
+    case "db-toggle": dbOpen=!dbOpen; try{ localStorage.setItem("burke-db-open", dbOpen?"1":"0"); }catch(_){} render(); break;
+    case "close-bg": if(e.target===el) closeSheet(); break;
+    case "back": go(S.tab==="ent" ? (S.entBack||"dir") : S.tab==="dir" ? "inicio" : ["resumen","lresumen"].includes(S.tab) ? "calendario" : S.from); break;
+    case "dir": S.dirK=el.dataset.k; go("dir"); break;
+    case "ent-open": { const k=el.dataset.k; S.entK=k; S.dirK=k; S.entId=v; S.entBack=S.tab==="dir"?"dir":S.tab; go("ent"); break; }
+    case "ent-new": S.sheetK=S.dirK; sheetEnt(null); break;
+    case "ent-edit": S.sheetK=S.entK; sheetEnt(S.entId); break;
+    case "ct-new": sheetContacto(null); break;
+    case "ct-edit": sheetContacto(v); break;
+    case "ent-del": { if(!S.delArm){ S.delArm=true; drawEnt(); break; } const k=S.sheetK; DIRS[k]=DIRS[k].filter(x=>x.id!==editE.id); drop(KINDS[k].coll, editE.id); closeSheet(); toast("Ficha borrada"); S.dirK=k; go("dir"); break; }
+    case "ct-del": { if(!S.delArm){ S.delArm=true; drawContacto(); break; } const c=clone(ent(S.entK,S.entId)); c.contactos=c.contactos.filter(x=>x.id!==editCt.id); saveEnt(S.entK,c); closeSheet(); toast("Contacto borrado"); render(); break; }
+    case "pk-pick": { const k=el.dataset.k, K=KINDS[k], T=tgt(el.dataset.for), c=ent(k,v); T[K.idF]=v; T[K.nameF]=c.nombre; T[K.ctF]=""; render(); break; }
+    case "pk-create": { const k=el.dataset.k, K=KINDS[k], T=tgt(el.dataset.for), c={...blankE(k), id:nid(K.pref), nombre:v}; saveEnt(k,c); T[K.idF]=c.id; T[K.nameF]=v; T[K.ctF]=""; toast(`${v} ${K.guardado}`); render(); break; }
+    case "new-ev": chooseAdd("inicio", T0); break;
+    case "add-normal": { const p=S.pend; closeSheet(); startEvent(p.from, p.fecha); if(p.ini){ S.d.ini=p.ini; S.d.fin=p.fin; render(); } break; }
+    case "add-largo": { const p=S.pend; closeSheet(); startLargo(p.from, p.fecha); break; }
+    case "personal": S.from="inicio"; go("personal"); break;
+    case "new-day": chooseAdd("calendario", S.selDay); break;
+    case "ev-open": openSummary(v); break;
+    case "ev-edit": editEvent(S.viewId); break;
+    case "selday": S.selDay=v; if(S.calView!=="trimestre" && !v.startsWith(S.month)) S.month=v.slice(0,7); render(); break;
+    case "calview": S.calView=v; S.month=S.selDay.slice(0,7); render(); break;
+    case "cal-nav": { const k=+v;
+      if(S.calView==="semana"){ S.selDay=addDays(S.selDay,7*k); S.month=S.selDay.slice(0,7); }
+      else { const [y,m]=S.month.split("-").map(Number), step=S.calView==="trimestre"?3:1, base=S.calView==="trimestre"?Math.floor((m-1)/3)*3:m-1;
+        const dt=new Date(y,base+step*k,1,12); S.month=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`;
+        const inRange = S.calView==="trimestre" ? (T0.slice(0,4)==String(dt.getFullYear()) && Math.floor((+T0.slice(5,7)-1)/3)===Math.floor(dt.getMonth()/3)) : T0.startsWith(S.month);
+        S.selDay = inRange ? T0 : `${S.month}-01`; }
+      render(); break; }
+    case "cal-today": S.selDay=T0; S.month=T0.slice(0,7); render(); break;
+    case "goto-month": S.calView="mes"; S.month=v; S.selDay=T0.startsWith(v)?T0:`${v}-01`; render(); break;
+    case "slot": { if(e.target!==el) break; const rc=el.getBoundingClientRect(); const hh=Math.min(23,+el.dataset.h0+Math.floor((e.clientY-rc.top)/34));
+      chooseAdd("calendario", el.dataset.d, `${pad(hh)}:00`, `${pad(Math.min(23,hh+2))}:00`); break; }
+    case "step": S.step=+v; render(); window.scrollTo(0,0); break;
+    case "modo": { const r=d.equipo[+el.dataset.i]; if(r.modo!==v){ r.modo=v; if(v==="hora"&&!num(r.tarifa)) r.tarifa=20; } render(); break; }
+    case "p-rm": d.equipo.splice(+el.dataset.i,1); render(); break;
+    case "p-add": d.equipo.push(rowFrom(person(v))); render(); break;
+    case "p-new": { const p={...blankP(), id:nid("p"), nombre:v}; P.push(p); put("personal", p); d.equipo.push(rowFrom(p)); toast(`${v} añadido al evento y a Personal`); render(); break; }
+    case "am-on": d.amort[v]= el.checked ? 5 : 0; render(); break;
+    case "am-pct": d.amort[v]=+el.dataset.p; render(); break;
+    case "g-add": d.gastos.push({cat:v, imp:0}); render(); $(`#g-${d.gastos.length-1}`)?.focus(); break;
+    case "g-rm": d.gastos.splice(+el.dataset.i,1); render(); break;
+    case "obj": d.objetivo=+v; render(); break;
+    case "save": { if(!d.fecha){ S.step=0; render(); toast("Pon la fecha del evento"); break; }
+      if(!d.nombre.trim()) d.nombre="Evento sin nombre";
+      ensureEnt("clientes",d); ensureEnt("agentes",d); const saved={...clone(d), id:S.editId||nid("e")};
+      if(S.editId){ EV[EV.findIndex(x=>x.id===S.editId)]=saved; } else { EV.push(saved); } put("eventos", saved);
+      toast(S.editId?"Cambios guardados":"Evento guardado en el calendario");
+      S.month=d.fecha.slice(0,7); S.selDay=d.fecha; const wasEdit=S.editId; S.d=null; S.editId=null; if(wasEdit) openSummary(wasEdit); else go("calendario"); break; }
+    case "del": if(!S.delArm){ S.delArm=true; render(); break; }
+      EV=EV.filter(x=>x.id!==S.editId); drop("eventos", S.editId); toast("Evento borrado"); S.d=null; S.editId=null; go("calendario"); break;
+    case "p-open": sheetPersona(v||null); break;
+    case "lstep": { const L=S.L; if(+v===1){ if(!L.ini){ toast("Pon la fecha de inicio"); break; } if(!L.fin||L.fin<L.ini){ L.fin=L.ini; toast("La fecha de fin no puede ser antes del inicio"); } }
+      S.lstep=+v; render(); window.scrollTo(0,0); break; }
+    case "act-new": openAct(null, v); break;
+    case "act-edit": openAct(v); break;
+    case "act-rm": S.L.acts=S.L.acts.filter(a=>a.id!==v); render(); break;
+    case "act-g": { const i=actD.gente.indexOf(v); if(i<0) actD.gente.push(v); else actD.gente.splice(i,1); drawAct(); break; }
+    case "act-rep": actD.rep=v; drawAct(); break;
+    case "act-day": { const i=actD.dias.indexOf(v); if(i<0) actD.dias.push(v); else actD.dias.splice(i,1); drawAct(); break; }
+    case "lsave": { const L=S.L; if(!L.nombre.trim()) L.nombre="Evento largo sin nombre";
+      const before=L.acts.length; L.acts=L.acts.filter(a=>a.fecha>=L.ini&&a.fecha<=L.fin); const lost=before-L.acts.length;
+      ensureEnt("clientes",L); ensureEnt("agentes",L); const id=S.lEditId||nid("l"), saved={...clone(L), id};
+      if(S.lEditId){ LG[LG.findIndex(x=>x.id===id)]=saved; } else { LG.push(saved); } put("largos", saved);
+      toast((S.lEditId?"Cambios guardados":"Evento largo guardado")+(lost?` · ${lost} actividades fuera de fechas quitadas`:""));
+      S.month=L.ini.slice(0,7); S.selDay=L.ini; S.L=null; S.lEditId=null; S.lViewId=id; go("lresumen"); break; }
+    case "ldel": if(!S.delArm){ S.delArm=true; render(); break; }
+      LG=LG.filter(x=>x.id!==S.lEditId); drop("largos", S.lEditId); toast("Evento largo borrado"); S.L=null; S.lEditId=null; go("calendario"); break;
+    case "lg-open": S.lViewId=v; go("lresumen"); break;
+    case "lg-edit": { const l=LG.find(x=>x.id===S.lViewId); S.L=clone(l); S.lEditId=l.id; S.lstep=0; S.from="lresumen"; go("largo"); break; }
+    case "photo": $("#photoIn").click(); break;
+    case "p-del": if(!S.delArm){ S.delArm=true; drawPersona(); break; }
+      P=P.filter(x=>x.id!==editP.id); drop("personal", editP.id); closeSheet(); toast("Ficha borrada"); render(); break;
+  }
+});
+document.addEventListener("input", e=>{
+  const el=e.target, d=S.d;
+  if(el.id==="per-q"){ S.perQ=el.value; $("#per-list").innerHTML=personalRows(el.value); return; }
+  if(el.id==="pick-q"){ $("#pick-res").innerHTML=pickRows(el.value); return; }
+  if(el.id==="act-q"){ $("#act-plist").innerHTML=actPeople(el.value); return; }
+  if(el.dataset.a && actD){ actD[el.dataset.a]=el.value; return; }
+  if(el.dataset.l && S.L){ S.L[el.dataset.l]=el.value; return; }
+  if(el.classList.contains("pkq")){ const k=el.dataset.k, K=KINDS[k], T=tgt(el.dataset.for); T[K.nameF]=el.value; T[K.idF]=null; T[K.ctF]=""; $("#ct-wrap-"+k)?.remove(); el.closest(".clpick").querySelector(".linked")?.remove(); showPick(el); return; }
+  if(el.id==="dirq"){ S.dirQ={...(S.dirQ||{}), [el.dataset.k]:el.value}; $("#dir-list").innerHTML=entRows(el.dataset.k, el.value); return; }
+  if(!d || el.closest("#pForm")) return;
+  if(el.dataset.f){ d[el.dataset.f]=el.value; if(["ini","fin","lugar"].includes(el.dataset.f)) updateDur(); updateScore(); }
+  if(el.dataset.p){ const i=+el.dataset.i, r=d.equipo[i], k=el.dataset.p; r[k] = (k==="horas"&&el.value==="") ? null : num(el.value); const pc=$("#pc-"+i); if(pc) pc.textContent="Cuesta "+eur(costeDe(r,d),2); updateScore(); }
+  if(el.dataset.g){ d.gastos[+el.dataset.g].imp=num(el.value); updateScore(); }
+  if(el.dataset.inv){ const inv=INV.find(x=>x.id===el.dataset.inv); inv.coste = el.value==="" ? null : num(el.value); updateScore(); }
+  if(el.id==="f-oferta"){ d.oferta = el.value==="" ? null : num(el.value); $("#ofertaRes").innerHTML=ofertaHTML(); }
+});
+document.addEventListener("focusin", e=>{ if(e.target.classList?.contains("pkq")) showPick(e.target); });
+document.addEventListener("mousedown", e=>{ if(!e.target.closest(".clpick")) document.querySelectorAll(".clres").forEach(x=>x.hidden=true); });
+document.addEventListener("change", e=>{
+  const el=e.target, d=S.d;
+  if(el.id && el.id.startsWith("ct-sel-")){ tgt(el.dataset.for)[KINDS[el.dataset.k].ctF]=el.value; return; }
+  if(el.dataset.pss && d){ const i=+el.dataset.pss, r=d.equipo[i]; r.ss=el.checked; const pc=$("#pc-"+i); if(pc) pc.textContent="Cuesta "+eur(costeDe(r,d),2); updateScore(); }
+  if(el.dataset.inv){ putConfig(); render(); }
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="pick-q"){ e.preventDefault(); $("#pick-res .prow")?.click(); } });
+document.addEventListener("submit", e=>{
+  e.preventDefault(); const f=e.target, d=S.d;
+  if(f.id==="newCat"){ const n=$("#cat-name").value.trim(); if(!n) return; if(!CATS.includes(n)){ CATS.push(n); putConfig(); } d.gastos.push({cat:n, imp:0}); render(); $(`#g-${d.gastos.length-1}`)?.focus(); }
+  if(f.id==="actForm"){ saveAct(); return; }
+  if(f.id==="eForm"){ submitEnt(); return; }
+  if(f.id==="ctForm"){ submitContacto(); return; }
+  if(f.id==="pForm"){ const p=editP; const nombre=$("#p-nombre").value.trim(); if(!nombre){ $("#p-nombre").focus(); return; }
+    Object.assign(p,{nombre, rol:$("#p-rol").value.trim(), tel:$("#p-tel").value.trim(), email:$("#p-email").value.trim(), zona:$("#p-zona").value.trim(), tallas:$("#p-tallas").value.trim(),
+      autonomo:$("#p-aut").value==="1", coche:$("#p-coche").value==="1", modo:$("#p-modo").value, imp:num($("#p-imp").value), ss:$("#p-ss").checked, notas:$("#p-notas").value.trim()});
+    const rec={...p}; delete rec.color; delete rec.fijo;
+    if(p.id){ P=P.map(x=>x.id===p.id?{...p}:x); toast("Ficha guardada"); } else { rec.id=p.id=nid("p"); P.push({...p}); toast(`${nombre} guardado en Personal`); }
+    put("personal", rec); closeSheet(); render(); }
+});
+$("#photoIn").addEventListener("change", e=>{
+  const file=e.target.files[0]; if(!file) return;
+  if(S.photoFor){ const who=S.photoFor; S.photoFor=null; const rd=new FileReader(); rd.onload=()=>{ const img=new Image(); img.onload=()=>{ const c=document.createElement("canvas"), z=160; c.width=c.height=z;
+      const k=Math.min(img.width,img.height); c.getContext("2d").drawImage(img,(img.width-k)/2,(img.height-k)/2,k,k,0,0,z,z);
+      const p={...person(who), foto:c.toDataURL("image/jpeg",.82)}; P=P.map(x=>x.id===who?p:x); const rec={...p}; delete rec.color; delete rec.fijo; put("personal", rec); toast("Foto de perfil actualizada"); render(); }; img.src=rd.result; }; rd.readAsDataURL(file); e.target.value=""; return; }
+  if(!editP) return;
+  const rd=new FileReader(); rd.onload=()=>{ const img=new Image(); img.onload=()=>{ const c=document.createElement("canvas"), z=160; c.width=c.height=z;
+      const k=Math.min(img.width,img.height); c.getContext("2d").drawImage(img,(img.width-k)/2,(img.height-k)/2,k,k,0,0,z,z);
+      const keep=readPForm(); editP={...editP, ...keep, foto:c.toDataURL("image/jpeg",.82)}; drawPersona(); }; img.src=rd.result; }; rd.readAsDataURL(file); e.target.value="";
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $(".sheet")) closeSheet(); });
+
+const VIEW_TABS=["inicio","calendario","personal","resumen","lresumen","dir","ent","miarea"];
+function softRender(){ if(!$(".sheet") && VIEW_TABS.includes(S.tab)) render(); }
+let lastLoad=0;
+async function gasLoad(){
+  try{ const all=await RPC("getAll"); lastLoad=Date.now();
+    applyPersonal(all.personal||[]); EV=all.eventos||[]; LG=all.largos||[]; DIRS.clientes=all.clientes||[]; DIRS.agentes=all.agentes||[]; DIRS.proveedores=all.proveedores||[];
+    const v=all.config||{}; CATS=[...new Set([...CATS_DEF, ...(v.cats||[])])]; if(v.inv) INV.forEach(i=>{ if(v.inv[i.id]!==undefined) i.coste=v.inv[i.id]; });
+    softRender();
+  }catch(e){ toast(e&&e.code==="forbidden" ? "Tu cuenta de Google no tiene acceso a la hoja de datos." : "No se han podido cargar los datos de la hoja. Recarga la página."); }
+}
+async function initDB(){
+  if(window.SHEETS){ await window.SHEETS.start(); }
+  if(RPC){ await gasLoad(); document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && Date.now()-lastLoad>15000) gasLoad(); }); return; }
+  try{ DB = window.claude && window.claude.use ? await window.claude.use("db") : null; }catch(e){ DB=null; }
+  if(!DB){ toast("Sin base de datos en esta vista: lo que añadas no se guardará"); return; }
+  const sub=(coll,fn)=>DB.collection(coll).onSnapshot(snap=>{ fn(snap.docs.map(d=>({...d.data(), id:d.id}))); softRender(); }, ()=>{});
+  sub("personal", applyPersonal); sub("eventos", a=>{ EV=a; }); sub("largos", a=>{ LG=a; }); sub("clientes", a=>{ DIRS.clientes=a; }); sub("agentes", a=>{ DIRS.agentes=a; }); sub("proveedores", a=>{ DIRS.proveedores=a; });
+  DB.doc("config/app").onSnapshot(s=>{ const v=s.exists?s.data():{}; CATS=[...new Set([...CATS_DEF, ...(v.cats||[])])];
+    if(v.inv) INV.forEach(i=>{ if(v.inv[i.id]!==undefined) i.coste=v.inv[i.id]; }); softRender(); }, ()=>{});
+}
+const h=(location.hash||"").slice(1); if(["inicio","calendario"].includes(h)) S.tab=h;
+render(); initDB();
