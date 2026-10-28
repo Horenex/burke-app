@@ -1,0 +1,2 @@
+# GitHub Pages: no publicar el código fuente, solo la app
+exclude: [fuente, README.md]

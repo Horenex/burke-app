@@ -78,13 +78,15 @@ const gas = (fn, ...args) => new Promise((res,rej)=>google.script.run.withSucces
 const RPC = IS_GAS ? gas : (window.SHEETS ? (fn, ...args) => window.SHEETS[fn](...args) : null);
 const safeFoto = f => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(f||"") ? f : "";
 function withTotals(coll, obj){ if(coll!=="eventos") return obj; const r=calc(obj); return {...obj, precio:r.precio, coste:Math.round(r.total), limpio:Math.round(r.limpio)}; }
+let writing=0, writeSeq=0; // guardados en marcha (para no pisar lo local con una lectura antigua)
+async function rpcWrite(...args){ writing++; writeSeq++; try{ await RPC(...args); }catch(e){ dbErr(e); } finally{ writing--; } }
 async function put(coll, obj){
-  if(RPC){ try{ await RPC("put", coll, plain(withTotals(coll,obj))); }catch(e){ dbErr(e); } return; }
+  if(RPC){ await rpcWrite("put", coll, plain(withTotals(coll,obj))); return; }
   if(!DB) return; try{ await DB.collection(coll).doc(obj.id).set(plain(obj)); }catch(e){ dbErr(e); } }
 async function drop(coll, id){
-  if(RPC){ try{ await RPC("drop", coll, id); }catch(e){ dbErr(e); } return; }
+  if(RPC){ await rpcWrite("drop", coll, id); return; }
   if(!DB) return; try{ await DB.collection(coll).doc(id).delete(); }catch(e){ dbErr(e); } }
-async function putConfig(){ if(RPC){ const inv={}; INV.forEach(i=>inv[i.id]=i.coste); try{ await RPC("putConfig", {cats:CATS.filter(c=>!CATS_DEF.includes(c)), inv}); }catch(e){ dbErr(e); } return; }
+async function putConfig(){ if(RPC){ const inv={}; INV.forEach(i=>inv[i.id]=i.coste); await rpcWrite("putConfig", {cats:CATS.filter(c=>!CATS_DEF.includes(c)), inv}); return; }
   if(!DB) return; const inv={}; INV.forEach(i=>inv[i.id]=i.coste); try{ await DB.doc("config/app").set({cats:CATS.filter(c=>!CATS_DEF.includes(c)), inv}); }catch(e){ dbErr(e); } }
 const STEPS = ["Evento","Equipo","Amortización","Gastos","Precio"];
 const LSTEPS = ["Datos generales","Programa"];
@@ -850,18 +852,32 @@ $("#photoIn").addEventListener("change", e=>{
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $(".sheet")) closeSheet(); });
 
 const VIEW_TABS=["inicio","calendario","personal","resumen","lresumen","dir","ent","miarea"];
-function softRender(){ if(!$(".sheet") && VIEW_TABS.includes(S.tab)) render(); }
-let lastLoad=0;
-async function gasLoad(){
+// No se redibuja mientras alguien escribe o tiene una ficha abierta: se espera a que termine
+const typing = () => { const a=document.activeElement; return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); };
+let pendingRender=false;
+function softRender(){ if(!$(".sheet") && VIEW_TABS.includes(S.tab) && !typing()){ pendingRender=false; render(); } else pendingRender=true; }
+document.addEventListener("focusout", ()=>setTimeout(()=>{ if(pendingRender) softRender(); }, 50));
+// Actualización casi en directo: cada 20 s se vuelve a leer la hoja mientras la app está abierta
+const POLL_MS = 20000;
+let lastLoad=0, lastSig="", loading=false;
+async function gasLoad(quiet){
+  if(loading) return; loading=true;
+  const seq0=writeSeq;
   try{ const all=await RPC("getAll"); lastLoad=Date.now();
+    if(quiet && (writing>0 || writeSeq!==seq0 || (window.SHEETS && window.SHEETS.pending()))) return; // hay un guardado en marcha: se ignora esta lectura
+    const sig=JSON.stringify(all); if(quiet && sig===lastSig) return; lastSig=sig; // nada nuevo
     applyPersonal(all.personal||[]); EV=all.eventos||[]; LG=all.largos||[]; DIRS.clientes=all.clientes||[]; DIRS.agentes=all.agentes||[]; DIRS.proveedores=all.proveedores||[];
     const v=all.config||{}; CATS=[...new Set([...CATS_DEF, ...(v.cats||[])])]; if(v.inv) INV.forEach(i=>{ if(v.inv[i.id]!==undefined) i.coste=v.inv[i.id]; });
     softRender();
-  }catch(e){ toast(e&&e.code==="forbidden" ? "Tu cuenta de Google no tiene acceso a la hoja de datos." : "No se han podido cargar los datos de la hoja. Recarga la página."); }
+  }catch(e){ if(!quiet) toast(e&&e.code==="forbidden" ? "Tu cuenta de Google no tiene acceso a la hoja de datos." : "No se han podido cargar los datos de la hoja. Recarga la página."); }
+  finally{ loading=false; }
 }
 async function initDB(){
   if(window.SHEETS){ await window.SHEETS.start(); }
-  if(RPC){ await gasLoad(); document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && Date.now()-lastLoad>15000) gasLoad(); }); return; }
+  if(RPC){ await gasLoad();
+    document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && Date.now()-lastLoad>5000) gasLoad(true); });
+    setInterval(()=>{ if(document.visibilityState==="visible" && Date.now()-lastLoad>=POLL_MS-1000) gasLoad(true); }, POLL_MS);
+    return; }
   try{ DB = window.claude && window.claude.use ? await window.claude.use("db") : null; }catch(e){ DB=null; }
   if(!DB){ toast("Sin base de datos en esta vista: lo que añadas no se guardará"); return; }
   const sub=(coll,fn)=>DB.collection(coll).onSnapshot(snap=>{ fn(snap.docs.map(d=>({...d.data(), id:d.id}))); softRender(); }, ()=>{});
